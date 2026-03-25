@@ -1,4 +1,4 @@
-// Demo data for testing without Firebase
+// Demo data for testing without Supabase
 
 export const demoFamilies = [
   {

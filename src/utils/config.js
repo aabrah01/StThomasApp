@@ -1,7 +1,7 @@
 // App configuration
 
-// Set this to true to run in demo mode without Firebase
-// Demo mode uses local mock data instead of Firebase backend
+// Set this to true to run in demo mode without Supabase
+// Demo mode uses local mock data instead of the Supabase backend
 export const DEMO_MODE = true;
 
 // Demo credentials (only used when DEMO_MODE = true)

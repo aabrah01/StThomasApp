@@ -1,249 +1,109 @@
-# 🚀 St. Thomas Church Directory App - START HERE
+# St. Thomas Malankara Orthodox Church — Directory App
 
-Welcome! This is a complete React Native mobile app for church directory management.
-
-## 📱 What You Can Do Right Now (5 Minutes)
-
-### Test Without Any Setup - Demo Mode ✨
-
-The app comes with **demo mode enabled** so you can test immediately without Firebase!
+## Run It Right Now (5 Minutes)
 
 ```bash
-# 1. Install dependencies (one-time, takes 2-3 minutes)
 npm install
-
-# 2. Start the app
 npm start
-
-# 3. Scan QR code with Expo Go app on your phone
-#    (Download Expo Go from App Store or Google Play)
-
-# 4. Login with demo credentials:
-#    Email: demo@example.com
-#    Password: demo123
+# Login: demo@example.com / demo123
 ```
 
-**That's it!** You'll see a working church directory with:
-- 5 sample families
-- Calendar with events
-- Full navigation
-- All features working
-
-📖 **Full demo mode guide:** See `DEMO_MODE.md`
+No Supabase account needed. Demo mode is on by default.
 
 ---
 
-## 🏗️ When Ready to Use Real Data
+## When You're Ready for Real Data
 
-Follow these guides in order:
-
-### 1. Quick Setup (30 min)
-- Read: `QUICK_START.md`
-- Install Firebase
-- Configure basics
-
-### 2. Complete Setup (2-3 hours)
-- Read: `SETUP_GUIDE.md`
-- Detailed step-by-step
-- Add real church data
-
-### 3. Full Documentation
-- Read: `README.md`
-- All features explained
-- Deployment instructions
+| Step | Time | Guide |
+|---|---|---|
+| 1. Supabase setup | 20–30 min | `SETUP_GUIDE.md` |
+| 2. Add parish data | 30–60 min | `SETUP_GUIDE.md` |
+| 3. QB contribution sync | 20–30 min | `SETUP_GUIDE.md` |
 
 ---
 
-## 🎯 What's Included
+## What's Included
 
-### ✅ Complete Features
-- User authentication (email/password)
-- Church directory with photos
-- Family and member management
-- Google Calendar integration
-- Search and filtering
-- Offline support
-- User profiles
-- Role-based access (admin/member)
-
-### ✅ Professional Code
-- React Native + Expo
-- Firebase backend
-- Clean architecture
-- Responsive design
-- Error handling
-- Loading states
-
-### ✅ Ready for Production
-- Security rules included
-- Build configuration
-- App store ready
-- Over-the-air updates
+- Email/password authentication (Supabase Auth)
+- Church directory with family photos
+- Parish calendar with event details
+- YTD giving summary (synced from QuickBooks Desktop via QB Web Connector)
+- Parish documents (tax letters, annual reports)
+- Head-of-household access control for contribution data
+- Role-based access (admin / member)
+- Supabase Row Level Security on all tables
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```
 StThomasApp/
-├── START_HERE.md          ← You are here!
-├── DEMO_MODE.md           ← Test without Firebase
-├── QUICK_START.md         ← Fast setup guide
-├── SETUP_GUIDE.md         ← Detailed setup
-├── README.md              ← Full documentation
+├── START_HERE.md              ← You are here
+├── DEMO_MODE.md               ← Test without Supabase
+├── QUICK_START.md             ← Fast setup reference
+├── SETUP_GUIDE.md             ← Full step-by-step setup
+├── README.md                  ← Complete documentation
 │
-├── App.js                 ← Main entry point
-├── package.json           ← Dependencies
-├── app.json               ← Expo config
-├── firebase.config.js     ← Firebase setup
+├── supabase.config.js         ← Add your Supabase URL + key here
+├── App.js
+├── package.json
+├── app.json
+│
+├── supabase/
+│   ├── schema.sql             ← Run once in Supabase SQL Editor
+│   ├── qbwc-config.qwc        ← Open in QB Web Connector
+│   └── functions/
+│       └── qbwc-sync/         ← Edge Function for QB sync
 │
 └── src/
-    ├── screens/           ← All app screens
-    ├── components/        ← Reusable UI components
-    ├── services/          ← Backend logic
-    ├── navigation/        ← App navigation
-    ├── context/           ← State management
-    ├── styles/            ← Theme & styles
-    └── utils/             ← Helpers & constants
+    ├── screens/
+    ├── components/
+    ├── services/
+    │   ├── authService.js
+    │   ├── databaseService.js
+    │   ├── storageService.js
+    │   └── calendarService.js
+    ├── navigation/
+    ├── context/
+    ├── styles/
+    └── utils/
+        └── config.js          ← Toggle DEMO_MODE here
 ```
 
 ---
 
-## ⚡ Quick Commands
+## Toggle Demo / Production
 
-```bash
-# Install dependencies (first time only)
-npm install
-
-# Start development server
-npm start
-
-# Run on iOS (Mac only, requires Xcode)
-npm run ios
-
-# Run on Android (requires Android Studio)
-npm run android
-
-# Clear cache and restart
-npx expo start -c
-```
-
----
-
-## 🔄 Toggle Between Demo and Real Firebase
-
-### Using Demo Mode (Default)
-File: `src/utils/config.js`
 ```javascript
-export const DEMO_MODE = true;  // Demo mode ON
+// src/utils/config.js
+export const DEMO_MODE = true;   // ← demo data, no backend needed
+export const DEMO_MODE = false;  // ← connects to Supabase
 ```
 
-### Using Real Firebase
-```javascript
-export const DEMO_MODE = false;  // Demo mode OFF
-```
-
-Then configure `firebase.config.js` with your credentials.
+When switching to production, update `supabase.config.js` with your project URL and anon key.
 
 ---
 
-## 🆘 Troubleshooting
-
-### App won't install dependencies
-```bash
-# Make sure you have Node.js 18+
-node --version
-
-# If old version, download from: https://nodejs.org/
-```
-
-### App won't start
-```bash
-# Clear everything and reinstall
-rm -rf node_modules
-npm install
-npm start
-```
-
-### Login doesn't work (Demo Mode)
-- Use exact credentials: `demo@example.com` / `demo123`
-- Check that `DEMO_MODE = true` in `src/utils/config.js`
-
-### Expo Go can't connect
-- Make sure phone and computer are on same WiFi
-- Try restarting Expo with: `npm start`
-- Scan QR code again
-
----
-
-## 💡 What to Read Next
-
-Choose your path:
-
-### Path 1: Quick Demo (5 min)
-1. Run `npm install && npm start`
-2. Read `DEMO_MODE.md` while waiting
-3. Test the app!
-
-### Path 2: Quick Setup (30 min)
-1. Read `QUICK_START.md`
-2. Set up Firebase basics
-3. Connect your data
-
-### Path 3: Full Setup (2-3 hours)
-1. Read `SETUP_GUIDE.md`
-2. Complete Firebase setup
-3. Add all church data
-4. Configure Google Calendar
-5. Test thoroughly
-
-### Path 4: Deep Dive (1 day)
-1. Read `README.md`
-2. Understand all features
-3. Customize for your needs
-4. Deploy to app stores
-
----
-
-## 📞 Support
-
-**Documentation Files:**
-- `DEMO_MODE.md` - Test without backend
-- `QUICK_START.md` - Fast setup
-- `SETUP_GUIDE.md` - Complete setup
-- `README.md` - Full documentation
-
-**File Issues:**
-- Check console logs in terminal
-- Review error messages in Expo Go
-- Verify all setup steps completed
-
----
-
-## 🎉 You're All Set!
-
-The hardest part is done - the app is built! Now just:
-
-1. **Test it** (5 min with demo mode)
-2. **Configure it** (30 min with Firebase)
-3. **Customize it** (add your church data)
-4. **Deploy it** (submit to app stores)
-
-**Let's get started!** 👇
+## Quick Commands
 
 ```bash
-npm install && npm start
+npm start           # Start Expo dev server
+npm run ios         # iOS simulator (Mac + Xcode required)
+npm run android     # Android emulator (Android Studio required)
+npx expo start -c   # Clear cache and restart
 ```
 
 ---
 
-## 📋 Checklist
+## Checklist
 
-- [ ] Node.js 18+ installed
-- [ ] Ran `npm install`
+- [ ] `npm install` completed
 - [ ] App starts with `npm start`
-- [ ] Tested login with demo credentials
-- [ ] Explored all three tabs
-- [ ] Ready to set up Firebase (or staying in demo)
-
-**Next:** Open `DEMO_MODE.md` to learn more about testing without Firebase.
+- [ ] Login works with `demo@example.com` / `demo123`
+- [ ] Explored Directory, Calendar, and Profile tabs
+- [ ] Supabase project created and `schema.sql` run
+- [ ] `supabase.config.js` updated with real credentials
+- [ ] `DEMO_MODE` set to `false`
+- [ ] Parish families, members, and events added
+- [ ] QB Web Connector configured for contribution sync

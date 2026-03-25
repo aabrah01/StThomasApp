@@ -1,59 +1,48 @@
 # Quick Start Guide
 
-## Prerequisites Check
-- [ ] Node.js 18+ installed
-- [ ] npm installed
-- [ ] Expo CLI installed globally (`npm install -g expo-cli`)
-
-## Installation
+## Try It Now — No Backend Needed
 
 ```bash
 # 1. Install dependencies
 npm install
 
-# 2. Configure Firebase
-# Edit firebase.config.js with your Firebase credentials
-
-# 3. Start development server
+# 2. Start the app
 npm start
 
-# 4. Test on your device
-# Scan QR code with Expo Go app (iOS/Android)
+# 3. Scan QR code with Expo Go (iOS/Android)
+# 4. Login with demo credentials:
+#    Email:    demo@example.com
+#    Password: demo123
 ```
 
-## Minimum Required Setup
+Demo mode is on by default — no Supabase account needed.
 
-Before the app will work, you MUST:
+---
 
-1. **Create Firebase Project**
-   - Enable Authentication (Email/Password)
-   - Create Firestore database
-   - Create Storage bucket
-   - Deploy security rules from `firestore.rules` and `storage.rules`
-   - Update `firebase.config.js` with your config
+## Switching to Real Supabase
 
-2. **Add Google Calendar Config**
-   - Enable Google Calendar API
-   - Create API key
-   - Add to Firestore: `appSettings/config` document with:
-     - `googleCalendarId`
-     - `googleApiKey`
+Before the app will work with real data, you need to:
 
-3. **Create Test User**
-   - Add user in Firebase Authentication
-   - Create corresponding documents in:
-     - `members` collection (with userId field)
-     - `userRoles` collection (document ID = user's UID)
+1. **Create a Supabase project** at https://supabase.com
+   - Run `supabase/schema.sql` in the SQL Editor
+   - Create a Storage bucket named `family-photos` (set to Public)
+   - Update `supabase.config.js` with your Project URL and anon key
 
-4. **Add Placeholder Assets** (for building)
-   - `assets/icon.png` (1024x1024 px)
-   - `assets/splash.png` (1242x2436 px)
+2. **Turn off demo mode**
+   ```javascript
+   // src/utils/config.js
+   export const DEMO_MODE = false;
+   ```
 
-## Test Credentials Template
+3. **Create users** via Supabase Dashboard → Authentication → Invite user
+   - Link each user to a `members` row via `user_id`
+   - Add a `user_roles` row for each user
 
-After setup, you'll have:
-- Email: [your-test-email@example.com]
-- Password: [your-test-password]
+4. **Add parish data** — families, members, events, documents — via Table Editor
+
+See `SETUP_GUIDE.md` for detailed step-by-step instructions.
+
+---
 
 ## Common Commands
 
@@ -68,52 +57,32 @@ npm run ios
 npm run android
 
 # Clear cache and restart
-expo start -c
+npx expo start -c
 ```
 
-## First Login
-
-1. App will show login screen
-2. Enter your test user credentials
-3. You should see three tabs:
-   - Directory (list of families)
-   - Calendar (Google Calendar events)
-   - Profile (your user info)
+---
 
 ## Troubleshooting
 
 **App won't start:**
-- Run `npm install` again
-- Check Node.js version: `node --version` (should be 18+)
+```bash
+rm -rf node_modules && npm install && npm start
+```
 
-**Login fails:**
-- Verify Firebase config in `firebase.config.js`
-- Check user exists in Firebase Authentication
-- Ensure Email/Password auth is enabled
+**Login fails in demo mode:**
+- Use exact credentials: `demo@example.com` / `demo123`
+- Confirm `DEMO_MODE = true` in `src/utils/config.js`
+
+**Login fails with real Supabase:**
+- Check `supabase.config.js` has the correct URL and anon key
+- Confirm the user exists in Supabase Authentication
+- Confirm a `user_roles` row exists for that user
 
 **No data showing:**
-- Create at least one family in Firestore `families` collection
-- Create corresponding member in `members` collection
-- Link member to family via `familyId` field
+- Confirm families and members are inserted in Supabase
+- Check RLS policies are active (re-run `supabase/schema.sql` if needed)
 
-**Calendar empty:**
-- Verify `appSettings/config` exists in Firestore
-- Check Google Calendar is public
-- Ensure calendar has events
-
-## Next Steps
-
-1. Read `SETUP_GUIDE.md` for detailed instructions
-2. Review `README.md` for full documentation
-3. Add real church data to Firestore
-4. Create production builds with `eas build`
-
-## Support Files
-
-- `README.md` - Full documentation
-- `SETUP_GUIDE.md` - Step-by-step setup instructions
-- `firestore.rules` - Firestore security rules
-- `storage.rules` - Storage security rules
+---
 
 ## Project Structure
 
@@ -122,8 +91,21 @@ src/
 ├── navigation/      # App navigation
 ├── screens/         # All screens (auth, directory, calendar, profile)
 ├── components/      # Reusable UI components
-├── services/        # Firebase & API services
-├── context/         # Authentication context
+├── services/        # Supabase & API services
+│   ├── authService.js
+│   ├── databaseService.js
+│   ├── storageService.js
+│   └── calendarService.js
+├── context/         # Auth state
 ├── styles/          # Theme and common styles
-└── utils/           # Constants and helpers
+└── utils/           # Config, demo data, constants
 ```
+
+## Key Files
+
+| File | Purpose |
+|---|---|
+| `supabase.config.js` | Supabase client — add your URL + anon key here |
+| `src/utils/config.js` | Toggle `DEMO_MODE` here |
+| `supabase/schema.sql` | Run once in Supabase SQL Editor |
+| `supabase/qbwc-config.qwc` | Open in QB Web Connector for contribution sync |

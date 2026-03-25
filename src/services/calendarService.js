@@ -26,7 +26,7 @@ class CalendarService {
     // Real Google Calendar API
     try {
       if (!this.calendarId || !this.apiKey) {
-        throw new Error('Calendar not configured. Please configure in Firebase settings.');
+        throw new Error('Calendar not configured. Please add googleCalendarId and googleApiKey to Supabase app_settings.');
       }
 
       const params = {

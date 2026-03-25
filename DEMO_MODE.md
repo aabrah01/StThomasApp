@@ -1,156 +1,102 @@
-# Demo Mode - Test Without Firebase
+# Demo Mode — Test Without Supabase
 
-Demo mode allows you to test the app immediately without setting up Firebase, Google Calendar, or any backend services. Perfect for quick testing and demonstrations!
+Demo mode lets you run the full app immediately using local mock data — no Supabase account, no backend, no internet required.
 
 ## Quick Start
 
-1. **Install Dependencies**
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+npm start
+```
 
-2. **Start the App**
-   ```bash
-   npm start
-   ```
+Login with:
+- **Email:** `demo@example.com`
+- **Password:** `demo123`
 
-3. **Open on Your Device**
-   - Install "Expo Go" app from App Store (iOS) or Google Play (Android)
-   - Scan the QR code shown in your terminal
-   - Wait for the app to load
+That's it — you're in.
 
-4. **Login with Demo Credentials**
-   - Email: `demo@example.com`
-   - Password: `demo123`
-
-That's it! You're in!
+---
 
 ## What You'll See
 
 ### Directory Tab
 - 5 sample families (Johnson, Williams, Anderson, Martinez, Davis)
-- Each family has contact information and members
-- Search functionality works with sample data
-- Click any family to see details
+- Johnson and Williams families have stock photos
+- Search works with sample data
+- Tap any family to see members and contact info
 
 ### Calendar Tab
-- 6 sample events spread over the next 2 weeks
-- Calendar view with marked dates
-- Click dates to see events for that day
-- Pull to refresh (returns same demo data)
+- Sample parish events across multiple dates
+- Tap a date to see events for that day
 
 ### Profile Tab
-- Demo user "John Johnson"
-- Linked to Johnson Family
-- Member role displayed
-- Logout button (takes you back to login)
+- Demo user "John Johnson" (head of household)
+- Family photo upload (saves locally in demo)
+- **Giving · YTD** section showing sample contributions by category
+- **Parish Documents** section with sample tax letter, annual report, and receipt
+
+---
 
 ## Demo Data
 
-The app uses mock data from `src/utils/demoData.js`:
+All mock data lives in `src/utils/demoData.js`:
 - **5 families** with addresses and contact info
-- **9 members** across the families
-- **6 calendar events** (church services, Bible study, etc.)
-- **1 demo user** (John Johnson)
+- **9 members** across the families (John Johnson is flagged as head of household)
+- **Parish events** with dates, times, and locations
+- **6 YTD contributions** broken down by QB category (Tithe, Building Fund, etc.)
+- **3 parish documents** for the current year
+
+---
 
 ## Features You Can Test
 
-✅ User authentication (login/logout)
-✅ Password reset flow (simulated)
-✅ Browse church directory
-✅ Search families by name
-✅ View family details
-✅ See family members with roles
-✅ View calendar events
-✅ Select dates to filter events
-✅ Pull to refresh
-✅ User profile page
-✅ Navigation between tabs
-✅ Error handling
-✅ Loading states
+- ✅ Login / logout
+- ✅ Browse and search the directory
+- ✅ View family details and members
+- ✅ View and tap calendar events
+- ✅ Event detail screen
+- ✅ Profile page with giving summary and documents
+- ✅ Family photo upload (uses local URI in demo)
+- ✅ Head-of-household contribution gating
+- ✅ Navigation between all screens
 
-## Switching to Real Firebase
+---
 
-When you're ready to connect to real Firebase:
+## Switching to Real Supabase
 
-1. **Open `src/utils/config.js`**
-2. **Change this line:**
-   ```javascript
-   export const DEMO_MODE = false;  // Changed from true to false
-   ```
-
-3. **Configure Firebase:**
-   - Follow instructions in `SETUP_GUIDE.md`
-   - Update `firebase.config.js` with your credentials
-   - Set up Firestore, Storage, and Authentication
-   - Add Google Calendar API credentials
-
-4. **Restart the app**
-   ```bash
-   npm start
-   ```
-
-The app will now connect to your real Firebase backend!
-
-## Technical Details
-
-### How Demo Mode Works
-
-Demo mode is implemented in the service layer:
-- **authService.js** - Uses mock authentication, no Firebase Auth
-- **firestoreService.js** - Returns mock data instead of Firestore queries
-- **calendarService.js** - Returns mock events instead of Google Calendar API
-
-The configuration is controlled by a single flag in `src/utils/config.js`:
+1. Open `src/utils/config.js` and change:
 ```javascript
-export const DEMO_MODE = true;
+export const DEMO_MODE = false;
 ```
 
-### What's Mocked
-
-When `DEMO_MODE = true`:
-- ✅ User authentication (no real passwords checked)
-- ✅ Family/member data (from local JSON)
-- ✅ Calendar events (from local JSON)
-- ✅ User roles and permissions
-- ✅ Network delays (simulated for realism)
-
-### What's Not Mocked
-
-These still work normally in demo mode:
-- Navigation and routing
-- UI components and styling
-- Image handling (falls back to initials)
-- Search and filtering
-- Local state management
-- Pull to refresh
-- Error boundaries
-
-## Troubleshooting Demo Mode
-
-### App won't start
-```bash
-# Clear cache and reinstall
-rm -rf node_modules
-npm install
-npm start
+2. Update `supabase.config.js` with your project credentials:
+```javascript
+const SUPABASE_URL = 'https://your-project-ref.supabase.co';
+const SUPABASE_ANON_KEY = 'your-anon-key';
 ```
 
-### "Network error" on login
-- Check that `DEMO_MODE = true` in `src/utils/config.js`
-- Use exact demo credentials: `demo@example.com` / `demo123`
+3. Follow `SETUP_GUIDE.md` for the full setup walkthrough.
 
-### No data showing after login
-- Verify `src/utils/demoData.js` exists
-- Check console for errors: press `j` in terminal after `npm start`
+---
 
-### Changes not appearing
-- In Expo Go, shake device and select "Reload"
-- Or press `r` in the terminal where `npm start` is running
+## How Demo Mode Works
 
-## Customizing Demo Data
+The `DEMO_MODE` flag in `src/utils/config.js` controls a branch in every service method:
 
-Want to test with your own data? Edit `src/utils/demoData.js`:
+```
+authService.js      → mock login, no Supabase Auth
+databaseService.js  → returns data from demoData.js
+storageService.js   → returns local URI, no upload
+calendarService.js  → returns hardcoded events
+```
+
+Simulated network delays (200–500ms) are included so loading states and spinners behave exactly as they would in production.
+
+---
+
+## Customising Demo Data
+
+Edit `src/utils/demoData.js` to test with your own parish data:
 
 ```javascript
 export const demoFamilies = [
@@ -158,58 +104,25 @@ export const demoFamilies = [
     id: 'family1',
     familyName: 'Your Family Name',
     membershipId: 'MEM001',
-    // ... add your test data
+    // ...
   },
-  // ... add more families
 ];
 ```
 
-Then restart the app to see your changes.
+Restart the app after saving (`r` in the terminal or shake → Reload in Expo Go).
 
-## Performance
+---
 
-Demo mode is actually faster than Firebase because:
-- No network requests (instant responses)
-- No authentication delays
-- No image downloads
-- All data is local
+## Troubleshooting
 
-Perfect for:
-- UI/UX testing
-- Demonstrations
-- Development without internet
-- Client presentations
+**App won't start:**
+```bash
+rm -rf node_modules && npm install && npm start
+```
 
-## Limitations
+**Wrong credentials error:**
+- Use exactly `demo@example.com` / `demo123`
+- Confirm `DEMO_MODE = true` in `src/utils/config.js`
 
-Demo mode cannot test:
-- Real authentication security
-- Firebase security rules
-- Image uploads/downloads
-- Multi-user scenarios
-- Real-time data synchronization
-- Push notifications
-- Production performance
-
-For these, you'll need to set up the real Firebase backend.
-
-## Need Help?
-
-- **Testing basics**: This file (you're reading it!)
-- **Full setup**: See `SETUP_GUIDE.md`
-- **Quick reference**: See `QUICK_START.md`
-- **Complete docs**: See `README.md`
-
-## Summary
-
-Demo mode lets you:
-- ✅ Test the app in under 5 minutes
-- ✅ No Firebase account needed
-- ✅ No backend setup required
-- ✅ See all features working
-- ✅ Perfect for demonstrations
-
-When ready for production:
-- Change `DEMO_MODE` to `false`
-- Follow `SETUP_GUIDE.md`
-- Connect to real Firebase
+**Changes not appearing:**
+- Press `r` in the terminal, or shake your device and tap **Reload** in Expo Go
