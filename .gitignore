@@ -39,8 +39,8 @@ yarn-error.*
 *.swo
 *~
 
-# Firebase
-firebase.config.js.local
-.firebaserc
-firebase-debug.log
-firestore-debug.log
+# Claude Code
+.claude/
+
+# Supabase local
+.supabase/
