@@ -15,27 +15,34 @@ const MemberList = ({ members }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Family Members</Text>
-      {members.map((member) => (
-        <View key={member.id} style={styles.memberCard}>
-          <Avatar
-            source={member.photoUrl}
-            name={`${member.firstName} ${member.lastName}`}
-            size={50}
-          />
-          <View style={styles.memberInfo}>
-            <Text style={styles.memberName}>
-              {member.firstName} {member.lastName}
-            </Text>
-            <Text style={styles.memberRole}>{member.role}</Text>
-            {member.email && (
-              <Text style={styles.memberContact} numberOfLines={1}>
-                {member.email}
+      {members.map((member, index) => (
+        <View key={member.id}>
+          <View style={styles.memberRow}>
+            <Avatar
+              source={member.photoUrl}
+              name={`${member.firstName} ${member.lastName}`}
+              size={44}
+            />
+            <View style={styles.memberInfo}>
+              <Text style={styles.memberName}>
+                {member.firstName} {member.lastName}
               </Text>
-            )}
-            {member.phoneNumber && (
-              <Text style={styles.memberContact}>{member.phoneNumber}</Text>
-            )}
+              <View style={styles.roleBadge}>
+                <Text style={styles.memberRole}>{member.role}</Text>
+              </View>
+            </View>
+            <View style={styles.contactDetails}>
+              {member.email ? (
+                <Text style={styles.memberContact} numberOfLines={1}>
+                  {member.email}
+                </Text>
+              ) : null}
+              {member.phoneNumber ? (
+                <Text style={styles.memberContact}>{member.phoneNumber}</Text>
+              ) : null}
+            </View>
           </View>
+          {index < members.length - 1 && <View style={styles.divider} />}
         </View>
       ))}
     </View>
@@ -43,43 +50,54 @@ const MemberList = ({ members }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginTop: theme.spacing.md,
-  },
+  container: {},
   sectionTitle: {
-    fontSize: theme.fonts.sizes.lg,
-    fontWeight: '600',
+    fontSize: theme.fonts.sizes.md,
+    fontWeight: '700',
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
+    letterSpacing: -0.3,
   },
-  memberCard: {
+  memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.sm,
-    ...theme.shadows.sm,
+    paddingVertical: theme.spacing.sm,
   },
   memberInfo: {
-    flex: 1,
-    marginLeft: theme.spacing.md,
+    marginLeft: theme.spacing.sm,
+    minWidth: 100,
   },
   memberName: {
     fontSize: theme.fonts.sizes.md,
     fontWeight: '600',
     color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
+    marginBottom: 3,
+  },
+  roleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: theme.colors.surfaceSecondary,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.round,
   },
   memberRole: {
-    fontSize: theme.fonts.sizes.sm,
+    fontSize: theme.fonts.sizes.xs,
     color: theme.colors.primary,
     textTransform: 'capitalize',
-    marginBottom: theme.spacing.xs,
+    fontWeight: '600',
+  },
+  contactDetails: {
+    flex: 1,
+    alignItems: 'flex-end',
   },
   memberContact: {
-    fontSize: theme.fonts.sizes.sm,
+    fontSize: theme.fonts.sizes.xs,
     color: theme.colors.textSecondary,
+    textAlign: 'right',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: theme.colors.border,
   },
   emptyContainer: {
     padding: theme.spacing.lg,

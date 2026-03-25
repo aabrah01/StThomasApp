@@ -102,11 +102,9 @@ class CalendarService {
   }
 
   getEventsByDate(events, date) {
-    const targetDate = new Date(date).toDateString();
-    return events.filter(event => {
-      const eventDate = new Date(event.startDate).toDateString();
-      return eventDate === targetDate;
-    });
+    // Compare the ISO date prefix directly (YYYY-MM-DD) to avoid UTC vs local
+    // timezone mismatches that occur when passing date strings through new Date()
+    return events.filter(event => event.startDate.startsWith(date));
   }
 }
 

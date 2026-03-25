@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<QBWCXML>
+  <!-- ============================================================
+    St. Thomas Malankara Orthodox Church — QuickBooks Web Connector
+
+    Setup:
+      1. Open QuickBooks Web Connector on the Windows machine running QB Desktop
+      2. Click "Add an Application" and select this .qwc file
+      3. Enter the QBWC_PASSWORD you set in Supabase Edge Function secrets
+      4. Set the schedule (Run Every: 1440 minutes = nightly)
+      5. Click "Update Selected" to run a manual sync at any time
+    ============================================================ -->
+
+  <AppName>St. Thomas Parish Contribution Sync</AppName>
+  <AppID>stthomas-contribution-sync</AppID>
+
+  <!-- Replace YOUR_PROJECT_REF with your Supabase project reference -->
+  <AppURL>https://YOUR_PROJECT_REF.supabase.co/functions/v1/qbwc-sync</AppURL>
+
+  <AppDescription>Syncs QuickBooks Sales Receipts (contributions) to the parish app nightly.</AppDescription>
+  <AppSupport>https://YOUR_PROJECT_REF.supabase.co/functions/v1/qbwc-sync</AppSupport>
+
+  <!-- Must match QBWC_USERNAME secret set in Supabase -->
+  <UserName>qbwc</UserName>
+
+  <!-- Run on every open company file -->
+  <RunEvery>1440</RunEvery>
+
+  <!-- Minimum QB version required -->
+  <MinimumQBVersion>6.0</MinimumQBVersion>
+
+  <!-- qbXMLVersion: use the highest version your QB Desktop supports -->
+  <QBType>QBFS</QBType>
+  <Style>Document</Style>
+  <IsReadOnly>true</IsReadOnly>
+</QBWCXML>

@@ -30,70 +30,101 @@ const ContactInfo = ({ family }) => {
       <Text style={styles.sectionTitle}>Contact Information</Text>
 
       {family.phoneNumber && (
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Phone:</Text>
-          <TouchableOpacity onPress={handleCall}>
-            <Text style={styles.linkText}>{family.phoneNumber}</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.row} onPress={handleCall}>
+          <View style={styles.iconBox}>
+            <Text style={styles.icon}>📞</Text>
+          </View>
+          <View style={styles.rowContent}>
+            <Text style={styles.label}>Phone</Text>
+            <Text style={styles.value}>{family.phoneNumber}</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
       )}
 
       {family.email && (
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Email:</Text>
-          <TouchableOpacity onPress={handleEmail}>
-            <Text style={styles.linkText} numberOfLines={1}>
-              {family.email}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.row} onPress={handleEmail}>
+          <View style={styles.iconBox}>
+            <Text style={styles.icon}>✉️</Text>
+          </View>
+          <View style={styles.rowContent}>
+            <Text style={styles.label}>Email</Text>
+            <Text style={styles.value} numberOfLines={1}>{family.email}</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
       )}
 
       {family.address && (
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Address:</Text>
-          <TouchableOpacity onPress={handleAddress} style={styles.addressContainer}>
-            <Text style={styles.linkText}>
-              {family.address.street}
-            </Text>
-            <Text style={styles.linkText}>
+        <TouchableOpacity style={[styles.row, styles.lastRow]} onPress={handleAddress}>
+          <View style={styles.iconBox}>
+            <Text style={styles.icon}>📍</Text>
+          </View>
+          <View style={styles.rowContent}>
+            <Text style={styles.label}>Address</Text>
+            <Text style={styles.value}>{family.address.street}</Text>
+            <Text style={styles.value}>
               {family.address.city}, {family.address.state} {family.address.zipCode}
             </Text>
-          </TouchableOpacity>
-        </View>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
       )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginTop: theme.spacing.md,
-  },
+  container: {},
   sectionTitle: {
-    fontSize: theme.fonts.sizes.lg,
-    fontWeight: '600',
+    fontSize: theme.fonts.sizes.md,
+    fontWeight: '700',
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
+    letterSpacing: -0.3,
   },
-  infoRow: {
+  row: {
     flexDirection: 'row',
-    marginBottom: theme.spacing.md,
+    alignItems: 'center',
+    paddingVertical: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  lastRow: {
+    borderBottomWidth: 0,
+  },
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: theme.colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: theme.spacing.sm,
+  },
+  icon: {
+    fontSize: 16,
+  },
+  rowContent: {
+    flex: 1,
   },
   label: {
-    fontSize: theme.fonts.sizes.md,
+    fontSize: theme.fonts.sizes.xs,
+    color: theme.colors.textSecondary,
     fontWeight: '600',
-    color: theme.colors.text,
-    width: 80,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 2,
   },
-  linkText: {
+  value: {
     fontSize: theme.fonts.sizes.md,
     color: theme.colors.primary,
-    textDecorationLine: 'underline',
-    flex: 1,
+    fontWeight: '500',
   },
-  addressContainer: {
-    flex: 1,
+  chevron: {
+    fontSize: 22,
+    color: theme.colors.textLight,
+    marginLeft: theme.spacing.sm,
   },
 });
 

@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import authService from '../services/authService';
-import firestoreService from '../services/firestoreService';
+import databaseService from '../services/databaseService';
 
 const AuthContext = createContext({});
 
@@ -11,14 +11,14 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = authService.onAuthStateChange(async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
+    const unsubscribe = authService.onAuthStateChange(async (authUser) => {
+      if (authUser) {
+        setUser(authUser);
 
-        const { data: roleData } = await firestoreService.getUserRole(firebaseUser.uid);
+        const { data: roleData } = await databaseService.getUserRole(authUser.uid);
         setUserRole(roleData);
 
-        const { data: memberData } = await firestoreService.getMemberByUserId(firebaseUser.uid);
+        const { data: memberData } = await databaseService.getMemberByUserId(authUser.uid);
         setMember(memberData);
       } else {
         setUser(null);

@@ -40,9 +40,10 @@ export const commonStyles = StyleSheet.create({
 
   title: {
     fontSize: theme.fonts.sizes.xxl,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
+    letterSpacing: -0.5,
   },
 
   subtitle: {
@@ -55,44 +56,47 @@ export const commonStyles = StyleSheet.create({
   text: {
     fontSize: theme.fonts.sizes.md,
     color: theme.colors.text,
+    lineHeight: 22,
   },
 
   textSecondary: {
     fontSize: theme.fonts.sizes.sm,
     color: theme.colors.textSecondary,
+    lineHeight: 20,
   },
 
   button: {
     backgroundColor: theme.colors.primary,
-    paddingVertical: theme.spacing.md,
+    paddingVertical: 15,
     paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.round,
     alignItems: 'center',
     justifyContent: 'center',
     ...theme.shadows.sm,
   },
 
   buttonText: {
-    color: theme.colors.surface,
+    color: '#FFFFFF',
     fontSize: theme.fonts.sizes.md,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 
   buttonSecondary: {
-    backgroundColor: theme.colors.secondary,
-    paddingVertical: theme.spacing.md,
+    backgroundColor: theme.colors.surfaceSecondary,
+    paddingVertical: 15,
     paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.round,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   buttonOutline: {
     backgroundColor: 'transparent',
-    paddingVertical: theme.spacing.md,
+    paddingVertical: 14,
     paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
+    borderRadius: theme.borderRadius.round,
+    borderWidth: 1.5,
     borderColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -105,11 +109,10 @@ export const commonStyles = StyleSheet.create({
   },
 
   input: {
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceSecondary,
+    borderWidth: 0,
     borderRadius: theme.borderRadius.md,
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: 13,
     paddingHorizontal: theme.spacing.md,
     fontSize: theme.fonts.sizes.md,
     color: theme.colors.text,
@@ -119,8 +122,10 @@ export const commonStyles = StyleSheet.create({
   inputLabel: {
     fontSize: theme.fonts.sizes.sm,
     fontWeight: '600',
-    color: theme.colors.text,
+    color: theme.colors.textSecondary,
     marginBottom: theme.spacing.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
   errorText: {

@@ -1,17 +1,19 @@
 export const theme = {
   colors: {
-    primary: '#2C5F9E',        // Traditional church blue
-    secondary: '#8B4513',      // Warm brown
-    accent: '#DAA520',         // Gold accent
-    background: '#F5F5F5',     // Light gray background
-    surface: '#FFFFFF',        // White surface
-    text: '#333333',           // Dark gray text
-    textSecondary: '#666666',  // Medium gray text
-    textLight: '#999999',      // Light gray text
-    error: '#D32F2F',          // Red for errors
-    success: '#388E3C',        // Green for success
-    border: '#E0E0E0',         // Light border
-    disabled: '#BDBDBD',       // Disabled elements
+    primary: '#8C1B3A',
+    primaryLight: '#B8476A',
+    primaryDark: '#610E29',
+    accent: '#C9963A',
+    background: '#F9FAFB',
+    surface: '#FFFFFF',
+    surfaceSecondary: '#F3F4F6',
+    text: '#111827',
+    textSecondary: '#6B7280',
+    textLight: '#9CA3AF',
+    error: '#DC2626',
+    success: '#16A34A',
+    border: '#E5E7EB',
+    disabled: '#D1D5DB',
   },
 
   fonts: {
@@ -19,13 +21,13 @@ export const theme = {
     medium: 'System',
     bold: 'System',
     sizes: {
-      xs: 12,
-      sm: 14,
-      md: 16,
-      lg: 18,
+      xs: 11,
+      sm: 13,
+      md: 15,
+      lg: 17,
       xl: 20,
       xxl: 24,
-      xxxl: 32,
+      xxxl: 30,
     },
   },
 
@@ -39,34 +41,34 @@ export const theme = {
   },
 
   borderRadius: {
-    sm: 4,
-    md: 8,
-    lg: 12,
-    xl: 16,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 24,
     round: 999,
   },
 
   shadows: {
     sm: {
-      shadowColor: '#000',
+      shadowColor: '#1A1D2E',
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.18,
-      shadowRadius: 1.0,
-      elevation: 1,
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
     },
     md: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 3.0,
-      elevation: 3,
+      shadowColor: '#1A1D2E',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      elevation: 4,
     },
     lg: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 5.0,
-      elevation: 5,
+      shadowColor: '#1A1D2E',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.12,
+      shadowRadius: 20,
+      elevation: 8,
     },
   },
 };

@@ -4,15 +4,23 @@ import {
   Text,
   FlatList,
   TextInput,
+  TouchableOpacity,
   StyleSheet,
   RefreshControl,
+  Dimensions,
 } from 'react-native';
-import firestoreService from '../../services/firestoreService';
+import { Ionicons } from '@expo/vector-icons';
+import databaseService from '../../services/databaseService';
 import FamilyCard from '../../components/directory/FamilyCard';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import theme from '../../styles/theme';
 import commonStyles from '../../styles/commonStyles';
+
+const NUM_COLUMNS = 2;
+const CARD_MARGIN = theme.spacing.sm;
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_WIDTH = (SCREEN_WIDTH - theme.spacing.md * 2 - CARD_MARGIN) / NUM_COLUMNS;
 
 const DirectoryListScreen = ({ navigation }) => {
   const [families, setFamilies] = useState([]);
@@ -32,14 +40,12 @@ const DirectoryListScreen = ({ navigation }) => {
 
   const loadFamilies = async () => {
     setError('');
-    const { data, error: fetchError } = await firestoreService.getAllFamilies();
-
+    const { data, error: fetchError } = await databaseService.getAllFamilies();
     if (fetchError) {
       setError(fetchError);
     } else {
       setFamilies(data || []);
     }
-
     setLoading(false);
     setRefreshing(false);
   };
@@ -49,21 +55,15 @@ const DirectoryListScreen = ({ navigation }) => {
       setFilteredFamilies(families);
       return;
     }
-
     const query = searchQuery.toLowerCase();
-    const filtered = families.filter((family) =>
-      family.familyName.toLowerCase().includes(query)
+    setFilteredFamilies(
+      families.filter((f) => f.familyName.toLowerCase().includes(query))
     );
-    setFilteredFamilies(filtered);
   };
 
   const handleRefresh = () => {
     setRefreshing(true);
     loadFamilies();
-  };
-
-  const handleFamilyPress = (family) => {
-    navigation.navigate('FamilyDetail', { familyId: family.id });
   };
 
   if (loading) {
@@ -73,30 +73,44 @@ const DirectoryListScreen = ({ navigation }) => {
   return (
     <View style={commonStyles.container}>
       <View style={styles.searchContainer}>
+        <Ionicons name="search" size={18} color={theme.colors.textLight} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search families..."
+          placeholderTextColor={theme.colors.textLight}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close-circle" size={18} color={theme.colors.textLight} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ErrorMessage message={error} style={styles.error} />
 
       {filteredFamilies.length === 0 ? (
         <View style={styles.emptyContainer}>
+          <Ionicons name="people-outline" size={64} color={theme.colors.textLight} style={styles.emptyIcon} />
           <Text style={styles.emptyText}>
-            {searchQuery ? 'No families found matching your search.' : 'No families in directory.'}
+            {searchQuery ? 'No families found.' : 'No families in directory.'}
           </Text>
         </View>
       ) : (
         <FlatList
           data={filteredFamilies}
           keyExtractor={(item) => item.id}
+          numColumns={NUM_COLUMNS}
           renderItem={({ item }) => (
-            <FamilyCard family={item} onPress={() => handleFamilyPress(item)} />
+            <FamilyCard
+              family={item}
+              cardWidth={CARD_WIDTH}
+              onPress={() => navigation.navigate('FamilyDetail', { familyId: item.id })}
+            />
           )}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={styles.grid}
+          columnWrapperStyle={styles.row}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -112,31 +126,47 @@ const DirectoryListScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   searchContainer: {
-    padding: theme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    margin: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
     backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.round,
+    paddingHorizontal: theme.spacing.md,
     ...theme.shadows.sm,
   },
-  searchInput: {
-    backgroundColor: theme.colors.background,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    fontSize: theme.fonts.sizes.md,
+  searchIcon: {
+    marginRight: theme.spacing.sm,
   },
-  listContent: {
-    padding: theme.spacing.md,
+  clearButton: {
+    marginLeft: theme.spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: theme.fonts.sizes.lg,
+    color: theme.colors.text,
+  },
+  grid: {
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.lg,
+  },
+  row: {
+    justifyContent: 'space-between',
+    marginBottom: CARD_MARGIN,
   },
   error: {
     marginHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: theme.spacing.xl,
+  },
+  emptyIcon: {
+    marginBottom: theme.spacing.md,
   },
   emptyText: {
     fontSize: theme.fonts.sizes.md,

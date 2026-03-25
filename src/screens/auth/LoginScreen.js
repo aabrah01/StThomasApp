@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
+  Image,
   TextInput,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Image,
+  ScrollView,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import ErrorMessage from '../../components/common/ErrorMessage';
@@ -20,6 +21,7 @@ const LoginScreen = ({ navigation }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
+  const passwordRef = useRef(null);
 
   const handleLogin = async () => {
     setError('');
@@ -43,34 +45,49 @@ const LoginScreen = ({ navigation }) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>St. Thomas Directory</Text>
-          <Text style={styles.subtitle}>Welcome back</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <View style={styles.topSection}>
+          <Image
+            source={require('../../../assets/images/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.title}>St. Thomas Malankara{'\n'}Orthodox Church</Text>
         </View>
 
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
+        <View style={styles.card}>
+          <Text style={styles.welcomeText}>Welcome back</Text>
+          <Text style={styles.welcomeSubtext}>Sign in to your account</Text>
+
+          <View style={styles.inputGroup}>
             <Text style={commonStyles.inputLabel}>Email</Text>
             <TextInput
-              style={commonStyles.input}
-              placeholder="Enter your email"
+              style={styles.input}
+              placeholder="you@example.com"
+              placeholderTextColor={theme.colors.textLight}
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              blurOnSubmit={false}
               editable={!loading}
             />
           </View>
 
-          <View style={styles.inputContainer}>
+          <View style={styles.inputGroup}>
             <Text style={commonStyles.inputLabel}>Password</Text>
             <TextInput
-              style={commonStyles.input}
+              style={styles.input}
               placeholder="Enter your password"
+              placeholderTextColor={theme.colors.textLight}
+              ref={passwordRef}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              returnKeyType="go"
+              onSubmitEditing={handleLogin}
               editable={!loading}
             />
           </View>
@@ -78,24 +95,24 @@ const LoginScreen = ({ navigation }) => {
           <ErrorMessage message={error} />
 
           <TouchableOpacity
-            style={[commonStyles.button, loading && styles.buttonDisabled]}
+            style={[styles.loginButton, loading && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={loading}
           >
-            <Text style={commonStyles.buttonText}>
+            <Text style={styles.loginButtonText}>
               {loading ? 'Signing in...' : 'Sign In'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.forgotPasswordButton}
+            style={styles.forgotButton}
             onPress={() => navigation.navigate('ForgotPassword')}
             disabled={loading}
           >
-            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            <Text style={styles.forgotText}>Forgot Password?</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };
@@ -103,43 +120,89 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.primary,
   },
-  content: {
-    flex: 1,
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
-    padding: theme.spacing.lg,
   },
-  header: {
+  topSection: {
     alignItems: 'center',
-    marginBottom: theme.spacing.xl,
+    paddingVertical: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    marginBottom: theme.spacing.md,
   },
   title: {
-    fontSize: theme.fonts.sizes.xxxl,
-    fontWeight: 'bold',
-    color: theme.colors.primary,
-    marginBottom: theme.spacing.sm,
+    fontSize: theme.fonts.sizes.xxl,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+    textAlign: 'center',
+    lineHeight: 32,
   },
-  subtitle: {
-    fontSize: theme.fonts.sizes.lg,
+  card: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 32,
+    padding: theme.spacing.lg,
+    paddingTop: theme.spacing.xl,
+    marginHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.lg,
+  },
+  welcomeText: {
+    fontSize: theme.fonts.sizes.xxl,
+    fontWeight: '700',
+    color: theme.colors.text,
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  welcomeSubtext: {
+    fontSize: theme.fonts.sizes.md,
     color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.lg,
   },
-  form: {
-    width: '100%',
-  },
-  inputContainer: {
+  inputGroup: {
     marginBottom: theme.spacing.sm,
+  },
+  input: {
+    backgroundColor: theme.colors.surfaceSecondary,
+    borderRadius: theme.borderRadius.md,
+    paddingVertical: 13,
+    paddingHorizontal: theme.spacing.md,
+    fontSize: theme.fonts.sizes.md,
+    color: theme.colors.text,
+    marginTop: 4,
+  },
+  loginButton: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 15,
+    borderRadius: theme.borderRadius.round,
+    alignItems: 'center',
+    marginTop: theme.spacing.md,
+    ...theme.shadows.sm,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: theme.fonts.sizes.md,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
-  forgotPasswordButton: {
+  forgotButton: {
     alignItems: 'center',
     marginTop: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
   },
-  forgotPasswordText: {
+  forgotText: {
     color: theme.colors.primary,
     fontSize: theme.fonts.sizes.sm,
+    fontWeight: '600',
   },
 });
 

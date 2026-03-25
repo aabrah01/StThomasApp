@@ -1,27 +1,42 @@
-import { ref, getDownloadURL } from 'firebase/storage';
-import { storage } from '../../firebase.config';
+import { supabase } from '../../supabase.config';
+import { DEMO_MODE } from '../utils/config';
+
+// Supabase Storage bucket — create in Dashboard → Storage → New Bucket
+// Name: "family-photos", set to Public
+const BUCKET = 'family-photos';
 
 class StorageService {
-  async getImageUrl(path) {
+  async uploadFamilyPhoto(familyId, localUri) {
+    // Demo mode: return the local URI directly (no upload needed)
+    if (DEMO_MODE) {
+      return { url: localUri, error: null };
+    }
+
     try {
-      if (!path) {
-        return { url: null, error: null };
-      }
-      const imageRef = ref(storage, path);
-      const url = await getDownloadURL(imageRef);
-      return { url, error: null };
+      const response = await fetch(localUri);
+      const blob = await response.blob();
+      const path = `families/${familyId}/photo.jpg`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
+
+      if (uploadError) return { url: null, error: uploadError.message };
+
+      const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      return { url: data.publicUrl, error: null };
     } catch (error) {
-      console.error('Error getting image URL:', error);
+      console.error('Error uploading family photo:', error);
       return { url: null, error: error.message };
     }
   }
 
   async getFamilyPhotoUrl(familyId) {
-    return this.getImageUrl(`families/${familyId}/photo.jpg`);
-  }
-
-  async getMemberPhotoUrl(memberId) {
-    return this.getImageUrl(`members/${memberId}/photo.jpg`);
+    if (DEMO_MODE) return { url: null, error: null };
+    const { data } = supabase.storage
+      .from(BUCKET)
+      .getPublicUrl(`families/${familyId}/photo.jpg`);
+    return { url: data.publicUrl, error: null };
   }
 }
 

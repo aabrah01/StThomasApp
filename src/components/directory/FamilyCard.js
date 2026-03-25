@@ -1,22 +1,34 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import Avatar from '../common/Avatar';
+import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import theme from '../../styles/theme';
 
-const FamilyCard = ({ family, onPress }) => {
+const FamilyCard = ({ family, cardWidth, onPress }) => {
+  const initials = family.familyName
+    .trim()
+    .split(' ')
+    .map(w => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.content}>
-        <Avatar source={family.photoUrl} name={family.familyName} size={60} />
-        <View style={styles.info}>
-          <Text style={styles.familyName}>{family.familyName}</Text>
-          <Text style={styles.membershipId}>ID: {family.membershipId}</Text>
-          {family.address && (
-            <Text style={styles.address} numberOfLines={1}>
-              {family.address.city}, {family.address.state}
-            </Text>
-          )}
-        </View>
+    <TouchableOpacity style={[styles.card, { width: cardWidth }]} onPress={onPress} activeOpacity={0.85}>
+      <View style={styles.photoContainer}>
+        {family.photoUrl ? (
+          <Image source={{ uri: family.photoUrl }} style={styles.photo} />
+        ) : (
+          <View style={styles.placeholder}>
+            <Text style={styles.initials}>{initials}</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.info}>
+        <Text style={styles.familyName} numberOfLines={1}>{family.familyName}</Text>
+        {family.address ? (
+          <Text style={styles.location} numberOfLines={1}>
+            {family.address.city}, {family.address.state}
+          </Text>
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -26,32 +38,44 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
+    overflow: 'hidden',
     ...theme.shadows.md,
   },
-  content: {
-    flexDirection: 'row',
+  photoContainer: {
+    width: '100%',
+    aspectRatio: 1,
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  placeholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: theme.colors.primary,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initials: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.9)',
+    letterSpacing: 2,
   },
   info: {
-    flex: 1,
-    marginLeft: theme.spacing.md,
+    padding: theme.spacing.sm,
+    paddingHorizontal: 10,
   },
   familyName: {
-    fontSize: theme.fonts.sizes.lg,
-    fontWeight: '600',
+    fontSize: theme.fonts.sizes.sm,
+    fontWeight: '700',
     color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
+    marginBottom: 2,
   },
-  membershipId: {
-    fontSize: theme.fonts.sizes.sm,
+  location: {
+    fontSize: theme.fonts.sizes.xs,
     color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.xs,
-  },
-  address: {
-    fontSize: theme.fonts.sizes.sm,
-    color: theme.colors.textLight,
   },
 });
 

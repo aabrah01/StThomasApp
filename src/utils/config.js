@@ -10,5 +10,5 @@ export const DEMO_CREDENTIALS = {
   password: 'demo123',
 };
 
-// Set to false when you're ready to use real Firebase
-// Remember to update firebase.config.js with your credentials
+// Set to false when you're ready to use Supabase
+// Remember to update supabase.config.js with your project URL and anon key
