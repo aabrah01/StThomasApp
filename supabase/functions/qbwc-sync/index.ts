@@ -26,7 +26,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const QBWC_USERNAME    = Deno.env.get('QBWC_USERNAME') ?? 'qbwc';
-const QBWC_PASSWORD    = Deno.env.get('QBWC_PASSWORD') ?? '';
+// Fail-closed: if QBWC_PASSWORD is not set, all auth attempts are rejected.
+// Never falls back to an empty string — that would allow passwordless access.
+const QBWC_PASSWORD    = Deno.env.get('QBWC_PASSWORD') ?? null;
 const SUPABASE_URL     = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SVC_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
@@ -201,6 +203,12 @@ Deno.serve(async (req: Request) => {
 
     // ── authenticate ───────────────────────────────────────────────────────
     if (action === 'authenticate') {
+      // Reject all attempts if password is not configured
+      if (!QBWC_PASSWORD) {
+        console.error('QBWC_PASSWORD is not set — rejecting all auth attempts. Set this secret in Supabase.');
+        return new Response(soapEnvelope('authenticate', str('') + str('nvu')), { headers: HEADERS });
+      }
+
       const username = getTag(body, 'strUserName');
       const password = getTag(body, 'strPassword');
 

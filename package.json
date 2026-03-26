@@ -6,7 +6,9 @@
     "start": "npx expo start",
     "android": "npx expo start --android",
     "ios": "npx expo start --ios",
-    "web": "npx expo start --web"
+    "web": "npx expo start --web",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -33,7 +35,9 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.1.10",
+    "jest": "^30.3.0",
     "typescript": "~5.9.2"
   },
   "private": true

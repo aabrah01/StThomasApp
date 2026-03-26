@@ -157,7 +157,39 @@ create policy "admin_manage_documents" on documents
   );
 
 -- ============================================================
+-- Audit log — records all admin create/update/delete actions
+-- ============================================================
+create table audit_log (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     text,                        -- admin who performed the action ('demo' in demo mode)
+  action      text not null,               -- 'create' | 'update' | 'delete' | 'import' | 'invite' | etc.
+  table_name  text not null,               -- which table was affected
+  record_id   text,                        -- id of the affected record (nullable for bulk ops)
+  details     jsonb,                       -- additional context (name, email, etc.)
+  created_at  timestamptz default now()
+);
+
+-- Only admins can read the audit log; it is append-only (no updates/deletes)
+alter table audit_log enable row level security;
+create policy "admin_read_audit_log" on audit_log
+  for select using (
+    exists (select 1 from user_roles where user_id = auth.uid() and role = 'admin')
+  );
+-- Inserts come from the service-role key (admin console API routes), not the anon client
+
+-- ============================================================
 -- Storage bucket — run in Dashboard → Storage → New Bucket
--- Name: family-photos  |  Public: yes
+-- Name: family-photos  |  Public: NO (set to PRIVATE)
 -- ============================================================
 -- (Buckets cannot be created via SQL; use the Supabase dashboard.)
+--
+-- After creating the bucket, add these storage RLS policies in the SQL Editor:
+--
+--   create policy "auth_read_family_photos" on storage.objects
+--     for select using (bucket_id = 'family-photos' and auth.role() = 'authenticated');
+--
+--   create policy "auth_upload_family_photos" on storage.objects
+--     for insert with check (bucket_id = 'family-photos' and auth.role() = 'authenticated');
+--
+--   create policy "auth_update_family_photos" on storage.objects
+--     for update using (bucket_id = 'family-photos' and auth.role() = 'authenticated');
