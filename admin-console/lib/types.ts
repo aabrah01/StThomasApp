@@ -5,6 +5,10 @@ export interface Family {
   email?: string;
   phone?: string;
   address?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
   photoUrl?: string;
 }
 
@@ -20,14 +24,6 @@ export interface Member {
   isHeadOfHousehold: boolean;
 }
 
-export interface Document {
-  id: string;
-  title: string;
-  type: 'tax-letter' | 'annual-report' | 'receipt' | 'other';
-  url: string;
-  year: number;
-  createdAt: string;
-}
 
 export interface Contribution {
   id: string;

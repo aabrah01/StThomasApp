@@ -25,6 +25,16 @@ export async function POST(request: Request) {
   if (!email) return NextResponse.json({ error: 'email is required' }, { status: 400 });
 
   const supabase = createAdminSupabase();
+
+  // Only allow inviting emails that exist in the members table
+  const { count } = await supabase
+    .from('members')
+    .select('id', { count: 'exact', head: true })
+    .eq('email', email);
+  if (!count || count === 0) {
+    return NextResponse.json({ error: 'This email does not belong to a registered member.' }, { status: 400 });
+  }
+
   const { data: { user }, error } = await supabase.auth.admin.inviteUserByEmail(email);
   if (error) return NextResponse.json({ error: 'Failed to send invitation' }, { status: 400 });
 

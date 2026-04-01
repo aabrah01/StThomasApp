@@ -7,20 +7,53 @@ const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 export const dynamic = 'force-dynamic';
 
 export default async function UsersPage() {
-  let rows: { id: string; email: string; role: string; lastSignIn: string | null }[];
+  let rows: {
+    id: string; email: string; role: string; lastSignIn: string | null;
+    memberId: string | null; memberName: string | null; isHoh: boolean;
+  }[];
+  let eligibleMembers: { email: string; name: string }[];
 
   if (DEMO_MODE) {
-    rows = DEMO_USERS;
+    rows = DEMO_USERS.map(u => ({ ...u, memberId: null, memberName: null, isHoh: false }));
+    eligibleMembers = [];
   } else {
     const supabase = createAdminSupabase();
-    const { data: { users } } = await supabase.auth.admin.listUsers();
-    const { data: roles } = await supabase.from('user_roles').select('*');
+    const [{ data: { users } }, { data: roles }, { data: members }] = await Promise.all([
+      supabase.auth.admin.listUsers(),
+      supabase.from('user_roles').select('*'),
+      supabase.from('members').select('id, first_name, last_name, email, is_head_of_household'),
+    ]);
     const roleMap = new Map((roles ?? []).map(r => [r.user_id, r.role]));
-    rows = (users ?? []).map(u => ({
-      id: u.id, email: u.email ?? '',
-      role: roleMap.get(u.id) ?? 'member',
-      lastSignIn: u.last_sign_in_at ?? null,
-    }));
+    const memberByEmail = new Map(
+      (members ?? []).map(m => [m.email?.toLowerCase() ?? '', m])
+    );
+    rows = (users ?? []).map(u => {
+      const email = u.email ?? '';
+      const member = memberByEmail.get(email.toLowerCase());
+      return {
+        id: u.id, email,
+        role: roleMap.get(u.id) ?? 'member',
+        lastSignIn: u.last_sign_in_at ?? null,
+        memberId: member?.id ?? null,
+        memberName: member ? `${member.first_name} ${member.last_name}` : null,
+        isHoh: member?.is_head_of_household ?? false,
+      };
+    });
+
+    // Members with an email who don't already have an auth account.
+    // Deduplicate by email — multiple members may share one login.
+    const existingEmails = new Set(rows.map(r => r.email.toLowerCase()));
+    const seenEmails = new Set<string>();
+    eligibleMembers = (members ?? [])
+      .filter(m => {
+        if (!m.email) return false;
+        const key = m.email.toLowerCase();
+        if (existingEmails.has(key) || seenEmails.has(key)) return false;
+        seenEmails.add(key);
+        return true;
+      })
+      .map(m => ({ email: m.email!, name: `${m.first_name} ${m.last_name}` }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   return (
@@ -31,7 +64,7 @@ export default async function UsersPage() {
           <p className="text-gray-500 text-sm">{rows.length} users</p>
         </div>
       </div>
-      <UsersClient users={rows} />
+      <UsersClient users={rows} eligibleMembers={eligibleMembers} />
     </div>
   );
 }

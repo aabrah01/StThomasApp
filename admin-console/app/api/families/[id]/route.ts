@@ -1,6 +1,6 @@
 import { createAdminSupabase } from '@/lib/supabase';
 import { requireAdmin, isError } from '@/lib/requireAdmin';
-import { validateString, validateEmail, validateUrl, firstError } from '@/lib/validate';
+import { validateString, validateUrl, firstError } from '@/lib/validate';
 import { NextResponse } from 'next/server';
 
 type Params = { params: Promise<{ id: string }> };
@@ -11,14 +11,16 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const { id } = await params;
   const body = await request.json();
-  const { familyName, membershipId, email, phone, address, photoUrl, members } = body;
+  const { familyName, membershipId, address, address2, city, state, zip, photoUrl, members } = body;
 
   const err = firstError(
     validateString(familyName, 'familyName', true, 100),
     validateString(membershipId, 'membershipId', true, 20),
-    validateEmail(email),
-    validateString(phone, 'phone', false, 30),
     validateString(address, 'address', false, 255),
+    validateString(address2, 'address2', false, 255),
+    validateString(city, 'city', false, 100),
+    validateString(state, 'state', false, 50),
+    validateString(zip, 'zip', false, 20),
     validateUrl(photoUrl, 'photoUrl'),
   );
   if (err) return NextResponse.json({ error: err }, { status: 400 });
@@ -29,9 +31,11 @@ export async function PATCH(request: Request, { params }: Params) {
     .update({
       family_name: familyName,
       membership_id: membershipId,
-      email: email || null,
-      phone: phone || null,
       address: address || null,
+      address2: address2 || null,
+      city: city || null,
+      state: state || null,
+      zip: zip || null,
       photo_url: photoUrl || null,
     })
     .eq('id', id);

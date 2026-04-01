@@ -20,7 +20,7 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const { signIn, authError } = useAuth();
   const passwordRef = useRef(null);
 
   const handleLogin = async () => {
@@ -92,7 +92,7 @@ const LoginScreen = ({ navigation }) => {
             />
           </View>
 
-          <ErrorMessage message={error} />
+          <ErrorMessage message={error || authError} />
 
           <TouchableOpacity
             style={[styles.loginButton, loading && styles.buttonDisabled]}

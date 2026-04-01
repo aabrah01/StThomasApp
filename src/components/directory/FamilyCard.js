@@ -24,7 +24,9 @@ const FamilyCard = ({ family, cardWidth, onPress }) => {
       </View>
       <View style={styles.info}>
         <Text style={styles.familyName} numberOfLines={1}>{family.familyName}</Text>
-        {family.address ? (
+        {family.hohNames ? (
+          <Text style={styles.hohNames} numberOfLines={1}>{family.hohNames}</Text>
+        ) : family.address ? (
           <Text style={styles.location} numberOfLines={1}>
             {family.address.city}, {family.address.state}
           </Text>
@@ -53,7 +55,7 @@ const styles = StyleSheet.create({
   placeholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.primaryDark,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -72,6 +74,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: theme.colors.text,
     marginBottom: 2,
+  },
+  hohNames: {
+    fontSize: theme.fonts.sizes.xs,
+    color: theme.colors.accent,
+    fontWeight: '600',
   },
   location: {
     fontSize: theme.fonts.sizes.xs,

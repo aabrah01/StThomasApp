@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useWindowDimensions } from 'react-native';
 import {
   View,
   Text,
@@ -7,9 +8,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '../../context/AuthContext';
 import databaseService from '../../services/databaseService';
+import storageService from '../../services/storageService';
 import ContactInfo from '../../components/directory/ContactInfo';
 import MemberList from '../../components/directory/MemberList';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -18,11 +23,19 @@ import theme from '../../styles/theme';
 import commonStyles from '../../styles/commonStyles';
 
 const FamilyDetailScreen = ({ route, navigation }) => {
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
+  const photoAspectRatio = width >= 1024 ? 2.5 : isTablet ? 1.8 : 1.2;
   const { familyId } = route.params;
+  const { isAdmin, member: currentMember } = useAuth();
   const [family, setFamily] = useState(null);
   const [members, setMembers] = useState([]);
+  const [contributions, setContributions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [error, setError] = useState('');
+
+  const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     loadFamilyData();
@@ -30,10 +43,14 @@ const FamilyDetailScreen = ({ route, navigation }) => {
 
   const loadFamilyData = async () => {
     setError('');
-    const [familyResult, membersResult] = await Promise.all([
+    const promises = [
       databaseService.getFamilyById(familyId),
       databaseService.getMembersByFamilyId(familyId),
-    ]);
+    ];
+    if (isAdmin()) {
+      promises.push(databaseService.getContributions(familyId, currentYear));
+    }
+    const [familyResult, membersResult, contribResult] = await Promise.all(promises);
 
     if (familyResult.error) {
       setError(familyResult.error);
@@ -45,7 +62,43 @@ const FamilyDetailScreen = ({ route, navigation }) => {
       setMembers(membersResult.data || []);
     }
 
+    if (isAdmin() && contribResult?.data) {
+      setContributions(contribResult.data);
+    }
+
     setLoading(false);
+  };
+
+  const handleEditPhoto = () => {
+    Alert.alert('Family Photo', 'Update this family\'s photo', [
+      { text: 'Choose from Library', onPress: pickPhoto },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const pickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow access to your photo library.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setUploadingPhoto(true);
+      const { url, error: uploadError } = await storageService.uploadFamilyPhoto(familyId, result.assets[0].uri);
+      if (uploadError) {
+        Alert.alert('Upload failed', uploadError);
+      } else {
+        await databaseService.updateFamilyPhoto(familyId, url);
+        setFamily(prev => ({ ...prev, photoUrl: url }));
+      }
+      setUploadingPhoto(false);
+    }
   };
 
   if (loading) return <LoadingSpinner />;
@@ -69,7 +122,7 @@ const FamilyDetailScreen = ({ route, navigation }) => {
   return (
     <ScrollView style={commonStyles.container} showsVerticalScrollIndicator={false}>
       {/* Photo area wrapper — back button lives here as a sibling, NOT inside the photo TouchableOpacity */}
-      <View style={styles.photoWrapper}>
+      <View style={[styles.photoWrapper, { aspectRatio: photoAspectRatio }]}>
         <View style={styles.photoArea}>
           {family.photoUrl ? (
             <Image source={{ uri: family.photoUrl }} style={styles.photo} />
@@ -97,15 +150,77 @@ const FamilyDetailScreen = ({ route, navigation }) => {
         >
           <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
         </TouchableOpacity>
+
+        {isAdmin() && (
+          <TouchableOpacity
+            style={styles.editPhotoButton}
+            onPress={handleEditPhoto}
+            disabled={uploadingPhoto}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            {uploadingPhoto
+              ? <ActivityIndicator size="small" color="#FFFFFF" />
+              : <Ionicons name="camera" size={22} color="#FFFFFF" />}
+          </TouchableOpacity>
+        )}
       </View>
 
-      <View style={styles.content}>
+      <View style={[styles.content, isTablet && styles.contentTablet]}>
         <View style={styles.section}>
           <ContactInfo family={family} />
         </View>
         <View style={styles.section}>
           <MemberList members={members} />
         </View>
+
+        {isAdmin() && contributions.length > 0 && (() => {
+          const ytdTotal = contributions.reduce((sum, c) => sum + c.amount, 0);
+          const byCategory = contributions.reduce((acc, c) => {
+            acc[c.category] = (acc[c.category] || 0) + c.amount;
+            return acc;
+          }, {});
+          return (
+            <View style={styles.section}>
+              <Text style={styles.contribTitle}>Giving · {currentYear} YTD</Text>
+
+              {/* Total rollup */}
+              <View style={styles.contribRow}>
+                <View style={styles.contribIconBox}>
+                  <Ionicons name="heart-outline" size={18} color={theme.colors.primary} />
+                </View>
+                <View style={styles.contribContent}>
+                  <Text style={styles.contribLabel}>Total Contributions</Text>
+                  <Text style={styles.contribTotal}>
+                    ${ytdTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Category breakdown — indented under total */}
+              {Object.entries(byCategory).map(([category, amount], index) => (
+                <View
+                  key={category}
+                  style={[
+                    styles.contribRow,
+                    styles.contribCategoryRow,
+                    index === Object.keys(byCategory).length - 1 && styles.contribRowLast,
+                  ]}
+                >
+                  <View style={styles.contribIconBox}>
+                    <Ionicons name="pricetag-outline" size={14} color={theme.colors.textLight} />
+                  </View>
+                  <View style={[styles.contribContent, styles.contribCategoryInline]}>
+                    <Text style={styles.contribCategoryName} numberOfLines={1}>{category}</Text>
+                    <Text style={styles.contribCategoryAmount}>
+                      ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          );
+        })()}
+
       </View>
     </ScrollView>
   );
@@ -114,7 +229,7 @@ const FamilyDetailScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   photoWrapper: {
     width: '100%',
-    aspectRatio: 1.2,
+    aspectRatio: 1.2,  // overridden inline on tablet
     position: 'relative',
   },
   photoArea: {
@@ -158,6 +273,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 10,
   },
+  editPhotoButton: {
+    position: 'absolute',
+    top: 52,
+    right: theme.spacing.md,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(0,0,0,0.40)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
   nameOverlay: {
     position: 'absolute',
     bottom: 0,
@@ -176,20 +303,26 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    backgroundColor: theme.colors.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: theme.borderRadius.round,
   },
   badgeText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: theme.fonts.sizes.xs,
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontSize: theme.fonts.sizes.sm,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   content: {
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing.xl,
+  },
+  contentTablet: {
+    maxWidth: 720,
+    alignSelf: 'center',
+    width: '100%',
   },
   section: {
     backgroundColor: theme.colors.surface,
@@ -197,6 +330,74 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
     ...theme.shadows.sm,
+  },
+  contribTitle: {
+    fontSize: theme.fonts.sizes.xs,
+    fontWeight: '700',
+    color: theme.colors.accent,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: theme.spacing.sm,
+  },
+  contribRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  contribRowLast: {
+    borderBottomWidth: 0,
+  },
+  contribCategoryRow: {
+    paddingLeft: theme.spacing.lg,
+  },
+  contribCategoryInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  contribCategoryName: {
+    flex: 1,
+    fontSize: theme.fonts.sizes.sm,
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
+  },
+  contribCategoryAmount: {
+    fontSize: theme.fonts.sizes.sm,
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
+    marginLeft: theme.spacing.sm,
+  },
+  contribIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: theme.colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: theme.spacing.sm,
+  },
+  contribContent: {
+    flex: 1,
+  },
+  contribLabel: {
+    fontSize: theme.fonts.sizes.xs,
+    color: theme.colors.textSecondary,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 1,
+  },
+  contribTotal: {
+    fontSize: theme.fonts.sizes.lg,
+    color: theme.colors.accent,
+    fontWeight: '700',
+  },
+  contribAmount: {
+    fontSize: theme.fonts.sizes.md,
+    color: theme.colors.text,
+    fontWeight: '500',
   },
 });
 

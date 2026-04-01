@@ -12,7 +12,6 @@ import {
   demoMembers,
   demoUserRole,
   demoAppSettings,
-  demoDocuments,
   demoContributions,
 } from '../utils/demoData';
 
@@ -27,12 +26,11 @@ const mapFamily = (row) => ({
   membershipId: row.membership_id,
   address: {
     street: row.address,
+    street2: row.address2,
     city: row.city,
     state: row.state,
     zipCode: row.zip,
   },
-  phoneNumber: row.phone,
-  email: row.email,
   photoUrl: row.photo_url,
   isActive: row.is_active,
 });
@@ -51,14 +49,13 @@ const mapMember = (row) => ({
   photoUrl: row.photo_url,
 });
 
-const mapDocument = (row) => ({
-  id: row.id,
-  title: row.title,
-  description: row.description,
-  type: row.type,
-  year: row.year,
-  url: row.url,
-  uploadedAt: row.uploaded_at,
+
+const mapAppSettings = (row) => ({
+  googleCalendarId: row.google_calendar_id,
+  googleApiKey: row.google_api_key,
+  churchName: row.church_name,
+  churchAddress: row.church_address,
+  contactEmail: row.contact_email,
 });
 
 const mapContribution = (row) => ({
@@ -96,18 +93,39 @@ class DatabaseService {
       const families = demoFamilies
         .filter(f => f.isActive)
         .sort((a, b) => a.familyName.localeCompare(b.familyName))
-        .map(f => ({ ...f, photoUrl: demoPhotoOverrides[f.id] || f.photoUrl }));
+        .map(f => {
+          const hohMembers = demoMembers.filter(
+            m => m.familyId === f.id && m.isHeadOfHousehold && m.isActive
+          );
+          const hohNames = hohMembers.map(m => m.firstName).join(' & ') || null;
+          const allMembers = demoMembers.filter(m => m.familyId === f.id && m.isActive);
+          const memberFirstNames = allMembers.map(m => m.firstName);
+          const memberPhoneNumbers = allMembers.map(m => m.phoneNumber).filter(Boolean);
+          return { ...f, photoUrl: demoPhotoOverrides[f.id] || f.photoUrl, hohNames, memberFirstNames, memberPhoneNumbers };
+        });
       return { data: families, error: null };
     }
 
     const { data, error } = await supabase
       .from('families')
-      .select('*')
+      .select('*, members(id, first_name, phone_number, is_head_of_household, created_at)')
       .eq('is_active', true)
       .order('family_name', { ascending: true });
 
     if (error) return { data: null, error: error.message };
-    return { data: data.map(mapFamily), error: null };
+    return {
+      data: data.map(row => {
+        const family = mapFamily(row);
+        const hohMembers = (row.members || [])
+          .filter(m => m.is_head_of_household)
+          .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        family.hohNames = hohMembers.map(m => m.first_name).join(' & ') || null;
+        family.memberFirstNames = (row.members || []).map(m => m.first_name);
+        family.memberPhoneNumbers = (row.members || []).map(m => m.phone_number).filter(Boolean);
+        return family;
+      }),
+      error: null,
+    };
   }
 
   async getFamilyById(familyId) {
@@ -156,14 +174,48 @@ class DatabaseService {
       return { data: member, error: null };
     }
 
+    // Multiple members may share the same email and thus the same user_id — return the first
     const { data, error } = await supabase
       .from('members')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .limit(1);
 
     if (error) return { data: null, error: error.message };
-    return { data: mapMember(data), error: null };
+    return { data: data?.[0] ? mapMember(data[0]) : null, error: null };
+  }
+
+  async getMemberByEmail(email) {
+    // Multiple members may share an email — return the first match
+    const { data, error } = await supabase
+      .from('members')
+      .select('*')
+      .eq('email', email)
+      .limit(1);
+
+    if (error) return { data: null, error: error.message };
+    return { data: data?.[0] ? mapMember(data[0]) : null, error: null };
+  }
+
+  async getMembersByEmail(email) {
+    // Returns ALL members sharing this email (for bulk-linking on first login)
+    const { data, error } = await supabase
+      .from('members')
+      .select('*')
+      .eq('email', email);
+
+    if (error) return { data: null, error: error.message };
+    return { data: (data ?? []).map(mapMember), error: null };
+  }
+
+  async linkMemberToUser(memberId, userId) {
+    const { error } = await supabase
+      .from('members')
+      .update({ user_id: userId })
+      .eq('id', memberId)
+      .is('user_id', null); // safety: only update if still unlinked
+
+    return { error: error?.message ?? null };
   }
 
   async getUserRole(userId) {
@@ -180,23 +232,6 @@ class DatabaseService {
 
     if (error) return { data: null, error: error.message };
     return { data, error: null };
-  }
-
-  async getDocuments(year) {
-    if (DEMO_MODE) {
-      await new Promise(resolve => setTimeout(resolve, 200));
-      const docs = demoDocuments.filter(d => d.year === year);
-      return { data: docs, error: null };
-    }
-
-    const { data, error } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('year', year)
-      .order('uploaded_at', { ascending: false });
-
-    if (error) return { data: null, error: error.message };
-    return { data: data.map(mapDocument), error: null };
   }
 
   /**
@@ -245,7 +280,7 @@ class DatabaseService {
       .single();
 
     if (error) return { data: null, error: error.message };
-    return { data, error: null };
+    return { data: mapAppSettings(data), error: null };
   }
 }
 

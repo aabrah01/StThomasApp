@@ -101,7 +101,7 @@ export const demoMembers = [
     email: 'sarah.johnson@example.com',
     phoneNumber: '(555) 123-4567',
     role: 'parent',
-    isHeadOfHousehold: false,
+    isHeadOfHousehold: true,
     photoUrl: '',
     isActive: true,
   },
@@ -127,7 +127,7 @@ export const demoMembers = [
     email: 'michael.williams@example.com',
     phoneNumber: '(555) 234-5678',
     role: 'parent',
-    isHeadOfHousehold: false,
+    isHeadOfHousehold: true,
     photoUrl: '',
     isActive: true,
   },
@@ -140,7 +140,7 @@ export const demoMembers = [
     email: 'jennifer.williams@example.com',
     phoneNumber: '(555) 234-5678',
     role: 'parent',
-    isHeadOfHousehold: false,
+    isHeadOfHousehold: true,
     photoUrl: '',
     isActive: true,
   },
@@ -153,7 +153,7 @@ export const demoMembers = [
     email: 'david.anderson@example.com',
     phoneNumber: '(555) 345-6789',
     role: 'parent',
-    isHeadOfHousehold: false,
+    isHeadOfHousehold: true,
     photoUrl: '',
     isActive: true,
   },
@@ -478,35 +478,6 @@ export const demoContributions = [
   { id: 'contrib-6', familyId: 'family1', amount: 75.00,  date: '2026-03-15', category: 'Outreach', description: 'Community Outreach Fund', fiscalYear: 2026 },
 ];
 
-export const demoDocuments = [
-  {
-    id: 'doc1',
-    title: '2026 Charitable Contribution Letter',
-    description: 'Official tax acknowledgment letter for all donations made in 2026.',
-    type: 'tax-letter',
-    year: 2026,
-    url: 'https://www.w3.org/WAI/WCAG21/Techniques/pdf/sample.pdf',
-    uploadedAt: '2026-01-15T10:00:00',
-  },
-  {
-    id: 'doc2',
-    title: '2026 Annual Parish Report',
-    description: 'Summary of parish activities, financials, and membership for 2026.',
-    type: 'annual-report',
-    year: 2026,
-    url: 'https://www.w3.org/WAI/WCAG21/Techniques/pdf/sample.pdf',
-    uploadedAt: '2026-02-01T10:00:00',
-  },
-  {
-    id: 'doc3',
-    title: '2026 Stewardship Pledge Receipt',
-    description: 'Receipt confirming your stewardship pledge for the 2026 parish year.',
-    type: 'receipt',
-    year: 2026,
-    url: 'https://www.w3.org/WAI/WCAG21/Techniques/pdf/sample.pdf',
-    uploadedAt: '2026-01-10T10:00:00',
-  },
-];
 
 export const demoAppSettings = {
   googleCalendarId: 'demo-calendar',

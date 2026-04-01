@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
 import Avatar from '../common/Avatar';
 import theme from '../../styles/theme';
 
@@ -33,12 +33,16 @@ const MemberList = ({ members }) => {
             </View>
             <View style={styles.contactDetails}>
               {member.email ? (
-                <Text style={styles.memberContact} numberOfLines={1}>
-                  {member.email}
-                </Text>
+                <TouchableOpacity onPress={() => Linking.openURL(`mailto:${member.email}`)}>
+                  <Text style={[styles.memberContact, styles.emailLink]} numberOfLines={1}>
+                    {member.email}
+                  </Text>
+                </TouchableOpacity>
               ) : null}
               {member.phoneNumber ? (
-                <Text style={styles.memberContact}>{member.phoneNumber}</Text>
+                <TouchableOpacity onPress={() => Linking.openURL(`tel:${member.phoneNumber}`)}>
+                  <Text style={[styles.memberContact, styles.phoneLink]}>{member.phoneNumber}</Text>
+                </TouchableOpacity>
               ) : null}
             </View>
           </View>
@@ -54,7 +58,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: theme.fonts.sizes.md,
     fontWeight: '700',
-    color: theme.colors.text,
+    color: theme.colors.accent,
     marginBottom: theme.spacing.md,
     letterSpacing: -0.3,
   },
@@ -91,9 +95,16 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   memberContact: {
-    fontSize: theme.fonts.sizes.xs,
+    fontSize: theme.fonts.sizes.md,
     color: theme.colors.textSecondary,
     textAlign: 'right',
+    marginBottom: 2,
+  },
+  emailLink: {
+    color: theme.colors.sapphire,
+  },
+  phoneLink: {
+    color: theme.colors.sapphire,
   },
   divider: {
     height: 1,

@@ -1,4 +1,4 @@
-import type { Family, Member, Document, Contribution } from './types';
+import type { Family, Member, Contribution } from './types';
 
 export const DEMO_FAMILIES: Family[] = [
   { id: 'family1', familyName: 'Johnson Family',  membershipId: 'MEM001', email: 'johnson@example.com',  phone: '(555) 123-4567', address: '123 Oak Street, Springfield, IL 62701',  photoUrl: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=600&q=80' },
@@ -20,11 +20,6 @@ export const DEMO_MEMBERS: Member[] = [
   { id: 'member9', familyId: 'family5', firstName: 'Robert',   lastName: 'Davis',    role: 'parent', email: 'robert.davis@example.com',     phoneNumber: '(555) 567-8901', photoUrl: '', isHeadOfHousehold: true  },
 ];
 
-export const DEMO_DOCUMENTS: Document[] = [
-  { id: 'doc1', title: '2026 Charitable Contribution Letter', type: 'tax-letter',    url: 'https://www.w3.org/WAI/WCAG21/Techniques/pdf/sample.pdf', year: 2026, createdAt: '2026-01-15T10:00:00Z' },
-  { id: 'doc2', title: '2026 Annual Parish Report',           type: 'annual-report', url: 'https://www.w3.org/WAI/WCAG21/Techniques/pdf/sample.pdf', year: 2026, createdAt: '2026-02-01T10:00:00Z' },
-  { id: 'doc3', title: '2026 Stewardship Pledge Receipt',     type: 'receipt',       url: 'https://www.w3.org/WAI/WCAG21/Techniques/pdf/sample.pdf', year: 2026, createdAt: '2026-01-10T10:00:00Z' },
-];
 
 export const DEMO_CONTRIBUTIONS: (Contribution & { familyName: string })[] = [
   { id: 'contrib-1', familyId: 'family1', familyName: 'Johnson Family',  date: '2026-01-12', amount: 500.00, category: 'Tithe',             fiscalYear: 2026 },

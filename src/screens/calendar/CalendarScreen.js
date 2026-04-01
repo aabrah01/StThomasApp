@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
   RefreshControl,
+  ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import calendarService from '../../services/calendarService';
@@ -16,7 +18,11 @@ import theme from '../../styles/theme';
 import commonStyles from '../../styles/commonStyles';
 
 const CalendarScreen = ({ navigation }) => {
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
   const [events, setEvents] = useState([]);
+  const [monthLoading, setMonthLoading] = useState(false);
+  const loadedRangeRef = useRef({ min: null, max: null });
   const [selectedDate, setSelectedDate] = useState(() => {
     // Use local date parts to avoid UTC midnight shifting the date
     const d = new Date();
@@ -53,16 +59,52 @@ const CalendarScreen = ({ navigation }) => {
 
   const loadEvents = async () => {
     setError('');
-    const { data, error: fetchError } = await calendarService.getEvents();
+    const now = new Date();
+    const timeMin = new Date(now.getFullYear(), now.getMonth(), 1); // start of current month
+    const timeMax = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+    const { data, error: fetchError } = await calendarService.getEvents(
+      timeMin.toISOString(),
+      timeMax.toISOString(),
+    );
 
     if (fetchError && !data) {
       setError(fetchError);
     } else if (data) {
       setEvents(data);
+      loadedRangeRef.current = { min: timeMin, max: timeMax };
     }
 
     setLoading(false);
     setRefreshing(false);
+  };
+
+  const handleMonthChange = async (month) => {
+    const { min, max } = loadedRangeRef.current;
+    if (!min || !max) return;
+
+    // First and last moment of the navigated month
+    const monthStart = new Date(month.year, month.month - 1, 1);
+    const monthEnd = new Date(month.year, month.month, 0, 23, 59, 59);
+
+    if (monthEnd < min || monthStart > max) {
+      setMonthLoading(true);
+      const { data } = await calendarService.getEvents(
+        monthStart.toISOString(),
+        monthEnd.toISOString(),
+      );
+      if (data) {
+        setEvents(prev => {
+          const map = new Map(prev.map(e => [e.id, e]));
+          data.forEach(e => map.set(e.id, e));
+          return Array.from(map.values());
+        });
+        loadedRangeRef.current = {
+          min: monthStart < min ? monthStart : min,
+          max: monthEnd > max ? monthEnd : max,
+        };
+      }
+      setMonthLoading(false);
+    }
   };
 
   const markEventDates = () => {
@@ -113,9 +155,11 @@ const CalendarScreen = ({ navigation }) => {
 
   return (
     <View style={commonStyles.container}>
+      <View style={[styles.inner, isTablet && styles.innerTablet]}>
       <Calendar
         current={selectedDate}
         onDayPress={handleDayPress}
+        onMonthChange={handleMonthChange}
         markedDates={markedDates}
         theme={{
           backgroundColor: theme.colors.surface,
@@ -137,6 +181,13 @@ const CalendarScreen = ({ navigation }) => {
       />
 
       <ErrorMessage message={error} style={styles.error} />
+      {monthLoading && (
+        <ActivityIndicator
+          size="small"
+          color={theme.colors.primary}
+          style={styles.monthLoader}
+        />
+      )}
 
       <View style={styles.eventsSection}>
         <View style={styles.eventsHeader}>
@@ -174,11 +225,20 @@ const CalendarScreen = ({ navigation }) => {
           />
         )}
       </View>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  inner: {
+    flex: 1,
+  },
+  innerTablet: {
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
+  },
   calendar: {
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
@@ -186,6 +246,9 @@ const styles = StyleSheet.create({
   error: {
     marginHorizontal: theme.spacing.md,
     marginTop: theme.spacing.md,
+  },
+  monthLoader: {
+    marginTop: theme.spacing.sm,
   },
   eventsSection: {
     flex: 1,

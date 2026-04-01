@@ -9,16 +9,37 @@ export const AuthProvider = ({ children }) => {
   const [userRole, setUserRole] = useState(null);
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState('');
 
   useEffect(() => {
     const unsubscribe = authService.onAuthStateChange(async (authUser) => {
       if (authUser) {
+        // Verify the user has a matching member record before granting access.
+        // Do NOT call setUser yet — avoids any flash of authenticated content.
+        const { data: roleData } = await databaseService.getUserRole(authUser.id);
+
+        let { data: memberData } = await databaseService.getMemberByUserId(authUser.id);
+
+        // First login: user_id not yet set — look up all members sharing this email and link them all
+        if (!memberData && authUser.email) {
+          const { data: membersByEmail } = await databaseService.getMembersByEmail(authUser.email);
+          if (membersByEmail && membersByEmail.length > 0) {
+            await Promise.all(membersByEmail.map(m => databaseService.linkMemberToUser(m.id, authUser.id)));
+            memberData = { ...membersByEmail[0], userId: authUser.id };
+          }
+        }
+
+        if (!memberData) {
+          // No matching member record — reject access
+          await authService.signOut();
+          setAuthError('Your account is not registered as a church member. Please contact the church office.');
+          // Don't set loading=false here — signOut triggers onAuthStateChange again with null,
+          // which will hit the else branch below and set loading=false
+          return;
+        }
+
         setUser(authUser);
-
-        const { data: roleData } = await databaseService.getUserRole(authUser.uid);
         setUserRole(roleData);
-
-        const { data: memberData } = await databaseService.getMemberByUserId(authUser.uid);
         setMember(memberData);
       } else {
         setUser(null);
@@ -32,6 +53,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const signIn = async (email, password) => {
+    setAuthError('');
     const { user, error } = await authService.signIn(email, password);
     return { user, error };
   };
@@ -59,6 +81,7 @@ export const AuthProvider = ({ children }) => {
     userRole,
     member,
     loading,
+    authError,
     signIn,
     signOut,
     resetPassword,

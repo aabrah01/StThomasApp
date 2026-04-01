@@ -23,10 +23,24 @@ function LoginForm() {
     setError('');
 
     const supabase = createBrowserSupabase();
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: { user }, error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (authError) {
-      setError(authError.message);
+      setError('Invalid email or password.');
+      setLoading(false);
+      return;
+    }
+
+    // Verify admin role before allowing access
+    const { data: roleData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user!.id)
+      .single();
+
+    if (!roleData || roleData.role !== 'admin') {
+      await supabase.auth.signOut();
+      setError('Access denied. Admin role required.');
       setLoading(false);
       return;
     }
@@ -39,7 +53,7 @@ function LoginForm() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-lg w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <Image src="/logo.png" alt="St. Thomas logo" width={72} height={72} className="mx-auto mb-4 rounded-2xl" />
+          <Image src="/logo.png" alt="St. Thomas logo" width={72} height={71} loading="eager" style={{ height: 'auto' }} className="mx-auto mb-4 rounded-2xl" />
           <h1 className="text-2xl font-bold text-gray-900">Admin Console</h1>
           <p className="text-gray-500 text-sm mt-1">St. Thomas Malankara Orthodox Church</p>
         </div>
@@ -75,7 +89,7 @@ function LoginForm() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#8C1B3A] focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] focus:border-transparent"
               placeholder="admin@example.com"
             />
           </div>
@@ -86,7 +100,7 @@ function LoginForm() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#8C1B3A] focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] focus:border-transparent"
               placeholder="••••••••"
             />
           </div>
@@ -98,7 +112,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#8C1B3A] text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-[#6A1229] transition-colors disabled:opacity-60"
+            className="w-full bg-[#C8102E] text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-[#9B0020] transition-colors disabled:opacity-60"
           >
             {loading ? 'Signing in…' : 'Sign In'}
           </button>

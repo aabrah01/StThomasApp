@@ -5,11 +5,14 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../styles/theme';
 
 const EventDetailScreen = ({ route, navigation }) => {
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
   const { event } = route.params;
 
   const formatDate = (dateString) => {
@@ -62,7 +65,7 @@ const EventDetailScreen = ({ route, navigation }) => {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, isTablet && styles.scrollContentTablet]}
         showsVerticalScrollIndicator={false}
       >
         {/* Title block */}
@@ -108,7 +111,7 @@ const EventDetailScreen = ({ route, navigation }) => {
                 </View>
                 <View style={styles.infoText}>
                   <Text style={styles.infoLabel}>Location</Text>
-                  <Text style={styles.infoValue}>{event.location}</Text>
+                  <Text style={styles.infoValueLocation}>{event.location}</Text>
                 </View>
               </View>
             </>
@@ -170,6 +173,11 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     paddingBottom: theme.spacing.xl,
   },
+  scrollContentTablet: {
+    maxWidth: 720,
+    alignSelf: 'center',
+    width: '100%',
+  },
   titleCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.lg,
@@ -186,7 +194,7 @@ const styles = StyleSheet.create({
   },
   eventDate: {
     fontSize: theme.fonts.sizes.md,
-    color: theme.colors.primary,
+    color: theme.colors.accent,
     fontWeight: '600',
   },
   infoCard: {
@@ -226,6 +234,11 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontWeight: '500',
   },
+  infoValueLocation: {
+    fontSize: theme.fonts.sizes.md,
+    color: theme.colors.sapphire,
+    fontWeight: '500',
+  },
   separator: {
     height: 1,
     backgroundColor: theme.colors.border,
@@ -239,7 +252,7 @@ const styles = StyleSheet.create({
   },
   descriptionLabel: {
     fontSize: theme.fonts.sizes.sm,
-    color: theme.colors.textLight,
+    color: theme.colors.accent,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,

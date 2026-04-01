@@ -1,21 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 
 interface User {
   id: string;
   email: string;
   role: string;
   lastSignIn: string | null;
+  memberId: string | null;
+  memberName: string | null;
+  isHoh: boolean;
 }
 
-export default function UsersClient({ users: initial }: { users: User[] }) {
+export default function UsersClient({ users: initial, eligibleMembers }: { users: User[]; eligibleMembers: { email: string; name: string }[] }) {
   const [users, setUsers] = useState(initial);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
   const [inviting, setInviting] = useState(false);
   const [inviteMsg, setInviteMsg] = useState('');
   const [resetMsg, setResetMsg] = useState<{ id: string; msg: string; ok: boolean } | null>(null);
+
+  const [createEmail, setCreateEmail] = useState('');
+  const [createPassword, setCreatePassword] = useState('');
+  const [createConfirm, setCreateConfirm] = useState('');
+  const [createRole, setCreateRole] = useState('member');
+  const [creating, setCreating] = useState(false);
+  const [createMsg, setCreateMsg] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleResetPassword = async (user: User) => {
     setResetMsg(null);
@@ -52,6 +63,41 @@ export default function UsersClient({ users: initial }: { users: User[] }) {
     setInviting(false);
   };
 
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (createPassword !== createConfirm) {
+      setCreateMsg('Passwords do not match.');
+      return;
+    }
+    setCreating(true);
+    setCreateMsg('');
+    const res = await fetch('/api/users/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: createEmail, password: createPassword, role: createRole }),
+    });
+    const json = await res.json();
+    if (res.ok) {
+      setUsers(prev => [...prev, { id: json.id, email: json.email, role: json.role, lastSignIn: null, memberId: null, memberName: null, isHoh: false }]);
+      setCreateEmail(''); setCreatePassword(''); setCreateConfirm('');
+      setCreateMsg(`User ${json.email} created successfully.`);
+    } else {
+      setCreateMsg(json.error);
+    }
+    setCreating(false);
+  };
+
+  const handleHohToggle = async (user: User) => {
+    if (!user.memberId) return;
+    const newVal = !user.isHoh;
+    setUsers(prev => prev.map(u => u.id === user.id ? { ...u, isHoh: newVal } : u));
+    await fetch('/api/users/hoh', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memberId: user.memberId, isHoh: newVal }),
+    });
+  };
+
   const handleDelete = async (user: User) => {
     if (!confirm(`Remove access for ${user.email}?`)) return;
     await fetch(`/api/users/${user.id}`, { method: 'DELETE' });
@@ -68,23 +114,83 @@ export default function UsersClient({ users: initial }: { users: User[] }) {
         )}
         <form onSubmit={handleInvite} className="flex gap-3 items-end">
           <div className="flex-1">
-            <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Email</label>
-            <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} required
-              placeholder="user@example.com"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8C1B3A]" />
+            <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Member</label>
+            <select value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} required
+              className="w-full border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]">
+              <option value="">Select a member…</option>
+              {eligibleMembers.map(m => (
+                <option key={m.email} value={m.email}>{m.name} — {m.email}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Role</label>
             <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#8C1B3A]">
+              className="border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]">
               <option value="member">Member</option>
               <option value="admin">Admin</option>
             </select>
           </div>
           <button type="submit" disabled={inviting}
-            className="bg-[#8C1B3A] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#6A1229] transition-colors disabled:opacity-50 h-[38px]">
+            className="bg-[#C8102E] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#9B0020] transition-colors disabled:opacity-50 h-[38px]">
             {inviting ? 'Sending…' : 'Send Invite'}
           </button>
+        </form>
+      </div>
+
+      {/* Create user with password */}
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+        <h2 className="font-semibold text-gray-900 mb-1">Create User</h2>
+        <p className="text-xs text-gray-400 mb-4">Account is active immediately — no confirmation email sent.</p>
+        {createMsg && (
+          <p className={`text-sm mb-3 ${createMsg.includes('successfully') ? 'text-green-600' : 'text-red-600'}`}>{createMsg}</p>
+        )}
+        <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Member *</label>
+            <select value={createEmail} onChange={e => setCreateEmail(e.target.value)} required
+              className="w-full border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]">
+              <option value="">Select a member…</option>
+              {eligibleMembers.map(m => (
+                <option key={m.email} value={m.email}>{m.name} — {m.email}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Role *</label>
+            <select value={createRole} onChange={e => setCreateRole(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]">
+              <option value="member">Member</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Password *</label>
+            <div className="relative">
+              <input type={showPassword ? 'text' : 'password'} value={createPassword} onChange={e => setCreatePassword(e.target.value)} required minLength={8}
+                placeholder="Min. 8 characters"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] pr-16" />
+              <button type="button" onClick={() => setShowPassword(p => !p)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600">
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Confirm Password *</label>
+            <input type={showPassword ? 'text' : 'password'} value={createConfirm} onChange={e => setCreateConfirm(e.target.value)} required
+              placeholder="Re-enter password"
+              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] ${createConfirm && createConfirm !== createPassword ? 'border-red-400' : 'border-gray-300'}`} />
+            {createConfirm && createConfirm !== createPassword && (
+              <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+            )}
+          </div>
+          <div className="md:col-span-2 flex justify-end">
+            <button type="submit" disabled={creating}
+              className="bg-[#C8102E] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#9B0020] transition-colors disabled:opacity-50 h-[38px]">
+              {creating ? 'Creating…' : 'Create User'}
+            </button>
+          </div>
         </form>
       </div>
 
@@ -94,22 +200,39 @@ export default function UsersClient({ users: initial }: { users: User[] }) {
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
               <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Linked Member</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">HOH</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Sign-in</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {users.map(u => (
-              <>
-                <tr key={u.id} className="hover:bg-gray-50">
+              <React.Fragment key={u.id}>
+                <tr className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{u.email}</td>
                   <td className="px-4 py-3">
+                    {u.memberName
+                      ? <span className="text-gray-900">{u.memberName}</span>
+                      : <span className="text-gray-400 text-xs italic">No match</span>}
+                  </td>
+                  <td className="px-4 py-3">
                     <select value={u.role} onChange={e => handleRoleChange(u.id, e.target.value)}
-                      className="border border-gray-200 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#8C1B3A]">
+                      className="border border-gray-200 rounded px-2 h-[30px] text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#C8102E]">
                       <option value="member">Member</option>
                       <option value="admin">Admin</option>
                     </select>
+                  </td>
+                  <td className="px-4 py-3">
+                    {u.memberId ? (
+                      <button onClick={() => handleHohToggle(u)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${u.isHoh ? 'bg-[#C8102E]' : 'bg-gray-200'}`}>
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${u.isHoh ? 'translate-x-4' : 'translate-x-1'}`} />
+                      </button>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-500">
                     {u.lastSignIn ? new Date(u.lastSignIn).toLocaleDateString() : 'Never'}
@@ -117,7 +240,7 @@ export default function UsersClient({ users: initial }: { users: User[] }) {
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-3">
                       <button onClick={() => handleResetPassword(u)}
-                        className="text-[#8C1B3A] hover:underline text-sm font-medium">
+                        className="text-[#1A4FC4] hover:underline text-sm font-medium">
                         Reset Password
                       </button>
                       <button onClick={() => handleDelete(u)} className="text-red-400 hover:text-red-600 text-sm">Remove</button>
@@ -125,13 +248,13 @@ export default function UsersClient({ users: initial }: { users: User[] }) {
                   </td>
                 </tr>
                 {resetMsg?.id === u.id && (
-                  <tr key={`${u.id}-msg`}>
-                    <td colSpan={4} className={`px-4 py-2 text-xs ${resetMsg.ok ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                  <tr>
+                    <td colSpan={6} className={`px-4 py-2 text-xs ${resetMsg.ok ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
                       {resetMsg.msg}
                     </td>
                   </tr>
                 )}
-              </>
+              </React.Fragment>
             ))}
           </tbody>
         </table>

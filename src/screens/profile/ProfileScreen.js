@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
-  Linking,
   ActivityIndicator,
   Image,
 } from 'react-native';
@@ -22,9 +21,8 @@ import commonStyles from '../../styles/commonStyles';
 import * as Application from 'expo-application';
 
 const ProfileScreen = ({ navigation }) => {
-  const { user, member, userRole, signOut } = useAuth();
+  const { user, member, userRole, signOut, isAdmin } = useAuth();
   const [family, setFamily] = useState(null);
-  const [documents, setDocuments] = useState([]);
   const [contributions, setContributions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -36,49 +34,17 @@ const ProfileScreen = ({ navigation }) => {
   }, [member]);
 
   const loadFamilyData = async () => {
-    const promises = [databaseService.getDocuments(currentYear)];
+    const promises = [];
     if (member?.familyId) {
       promises.push(
         databaseService.getFamilyById(member.familyId),
         databaseService.getContributions(member.familyId, currentYear),
       );
     }
-    const [docsResult, familyResult, contribResult] = await Promise.all(promises);
-    if (docsResult?.data) setDocuments(docsResult.data);
+    const [familyResult, contribResult] = await Promise.all(promises);
     if (familyResult?.data) setFamily(familyResult.data);
     if (contribResult?.data) setContributions(contribResult.data);
     setLoading(false);
-  };
-
-  const handleOpenDocument = async (doc) => {
-    try {
-      const supported = await Linking.canOpenURL(doc.url);
-      if (supported) {
-        await Linking.openURL(doc.url);
-      } else {
-        Alert.alert('Cannot open document', 'No app available to open this file.');
-      }
-    } catch {
-      Alert.alert('Error', 'Unable to open document.');
-    }
-  };
-
-  const docTypeLabel = (type) => {
-    switch (type) {
-      case 'tax-letter':    return 'Tax Letter';
-      case 'annual-report': return 'Annual Report';
-      case 'receipt':       return 'Receipt';
-      default:              return 'Document';
-    }
-  };
-
-  const docTypeIcon = (type) => {
-    switch (type) {
-      case 'tax-letter':    return 'document-text-outline';
-      case 'annual-report': return 'bar-chart-outline';
-      case 'receipt':       return 'receipt-outline';
-      default:              return 'document-outline';
-    }
   };
 
   const handleUploadFamilyPhoto = () => {
@@ -247,7 +213,7 @@ const ProfileScreen = ({ navigation }) => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Giving · {currentYear} YTD</Text>
 
-              {/* YTD total */}
+              {/* Total rollup */}
               <View style={styles.row}>
                 <View style={[styles.iconBox, styles.givingIconBox]}>
                   <Ionicons name="heart-outline" size={18} color={theme.colors.primary} />
@@ -260,21 +226,22 @@ const ProfileScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              {/* Breakdown by category (from QuickBooks) */}
+              {/* Category breakdown — indented under total */}
               {Object.entries(byCategory).map(([category, amount], index) => (
                 <View
                   key={category}
                   style={[
                     styles.row,
+                    styles.categoryRow,
                     index === Object.keys(byCategory).length - 1 && styles.lastRow,
                   ]}
                 >
                   <View style={[styles.iconBox, styles.givingIconBox]}>
-                    <Ionicons name="pricetag-outline" size={16} color={theme.colors.textSecondary} />
+                    <Ionicons name="pricetag-outline" size={14} color={theme.colors.textLight} />
                   </View>
-                  <View style={styles.rowContent}>
-                    <Text style={styles.rowLabel}>{category}</Text>
-                    <Text style={styles.rowValue}>
+                  <View style={[styles.rowContent, styles.categoryInline]}>
+                    <Text style={[styles.rowValue, styles.categoryName]} numberOfLines={1}>{category}</Text>
+                    <Text style={[styles.rowValue, styles.categoryAmount]}>
                       ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
                   </View>
@@ -283,28 +250,6 @@ const ProfileScreen = ({ navigation }) => {
             </View>
           );
         })()}
-
-        {documents.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Parish Documents</Text>
-            {documents.map((doc, index) => (
-              <TouchableOpacity
-                key={doc.id}
-                style={[styles.row, index === documents.length - 1 && styles.lastRow]}
-                onPress={() => handleOpenDocument(doc)}
-              >
-                <View style={[styles.iconBox, styles.docIconBox]}>
-                  <Ionicons name={docTypeIcon(doc.type)} size={18} color={theme.colors.primary} />
-                </View>
-                <View style={styles.rowContent}>
-                  <Text style={styles.rowValue} numberOfLines={1}>{doc.title}</Text>
-                  <Text style={styles.docMeta}>{docTypeLabel(doc.type)} · {doc.year}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={theme.colors.textLight} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>App</Text>
@@ -437,9 +382,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: theme.colors.textLight,
   },
-  docIconBox: {
-    backgroundColor: theme.colors.surfaceSecondary,
-  },
   givingIconBox: {
     backgroundColor: theme.colors.surfaceSecondary,
   },
@@ -448,16 +390,28 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: theme.fonts.sizes.lg,
   },
+  categoryRow: {
+    paddingLeft: theme.spacing.lg,
+  },
+  categoryInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  categoryName: {
+    flex: 1,
+    fontSize: theme.fonts.sizes.sm,
+    color: theme.colors.textSecondary,
+  },
+  categoryAmount: {
+    fontSize: theme.fonts.sizes.sm,
+    color: theme.colors.textSecondary,
+    marginLeft: theme.spacing.sm,
+  },
   familyPhotoThumb: {
     width: 36,
     height: 36,
     borderRadius: 8,
-  },
-  docMeta: {
-    fontSize: theme.fonts.sizes.xs,
-    color: theme.colors.textSecondary,
-    marginTop: 2,
-    fontWeight: '500',
   },
   logoutButton: {
     backgroundColor: theme.colors.surface,

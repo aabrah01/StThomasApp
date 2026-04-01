@@ -3,7 +3,7 @@
 // DEMO_MODE — set to true only for local development/testing.
 // NEVER deploy to the App Store or Play Store with DEMO_MODE = true.
 // When false, the app connects to your real Supabase backend.
-export const DEMO_MODE = true;
+export const DEMO_MODE = false;
 
 // Demo credentials — used only when DEMO_MODE = true.
 // These are fake test credentials and do not grant access to any real data.

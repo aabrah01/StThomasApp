@@ -23,7 +23,7 @@ const TabIcon = ({ name, focused }) => (
   <Ionicons
     name={focused ? name : `${name}-outline`}
     size={24}
-    color={focused ? theme.colors.primary : theme.colors.textLight}
+    color={focused ? theme.colors.accent : theme.colors.textLight}
   />
 );
 
@@ -43,7 +43,7 @@ const MainTabs = () => {
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: theme.colors.primary,
+        tabBarActiveTintColor: theme.colors.accent,
         tabBarInactiveTintColor: theme.colors.textLight,
         tabBarStyle: {
           backgroundColor: theme.colors.surface,

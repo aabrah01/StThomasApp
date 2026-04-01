@@ -9,11 +9,10 @@ create table families (
   family_name     text not null,
   membership_id   text unique,
   address         text,
+  address2        text,
   city            text,
   state           text,
   zip             text,
-  phone           text,
-  email           text,
   photo_url       text,
   is_active       boolean default true,
   created_at      timestamptz default now()
@@ -54,17 +53,6 @@ create table events (
   category        text,
   recurring       text,
   created_at      timestamptz default now()
-);
-
--- Documents (tax letters, reports, etc.)
-create table documents (
-  id              uuid primary key default gen_random_uuid(),
-  title           text not null,
-  description     text,
-  type            text,          -- e.g. 'tax-letter', 'annual-report', 'receipt'
-  year            integer,
-  url             text,          -- public URL to the PDF
-  uploaded_at     timestamptz default now()
 );
 
 -- ============================================================
@@ -112,6 +100,9 @@ create table qbwc_sessions (
   created_at  timestamptz default now()
 );
 
+-- Only accessed via service-role key (admin API routes), which bypasses RLS
+alter table qbwc_sessions enable row level security;
+
 -- ============================================================
 -- Row Level Security
 -- ============================================================
@@ -119,14 +110,23 @@ alter table families      enable row level security;
 alter table members       enable row level security;
 alter table user_roles    enable row level security;
 alter table events        enable row level security;
-alter table documents     enable row level security;
 alter table contributions enable row level security;
 
 -- All authenticated users can read the directory and events
 create policy "auth_read_families"  on families  for select using (auth.role() = 'authenticated');
 create policy "auth_read_members"   on members   for select using (auth.role() = 'authenticated');
 create policy "auth_read_events"    on events    for select using (auth.role() = 'authenticated');
-create policy "auth_read_documents" on documents for select using (auth.role() = 'authenticated');
+-- Users can read their own role (required for admin console auth check)
+create policy "users_read_own_role" on user_roles for select using (auth.uid() = user_id);
+
+-- Members can link their own auth account on first login (email match, user_id not yet set)
+create policy "member_self_link" on members
+  for update using (
+    email = auth.email() and user_id is null
+  )
+  with check (
+    user_id = auth.uid()
+  );
 
 -- Members can only update their own family record (for photo uploads)
 create policy "member_update_own_family" on families
@@ -134,12 +134,19 @@ create policy "member_update_own_family" on families
     id = (select family_id from members where user_id = auth.uid() limit 1)
   );
 
--- Contributions: only the head-of-household for that family can read
+-- Admins can manage all families
+create policy "admin_manage_families" on families
+  for all using (
+    exists (select 1 from user_roles where user_id = auth.uid() and role = 'admin')
+  );
+
+-- Contributions: only the head-of-household for that family can read.
+-- Matches on user_id (fast, post-link) or email (fallback for accounts not yet linked).
 create policy "hoh_read_own_contributions" on contributions
   for select using (
     family_id = (
       select family_id from members
-      where user_id = auth.uid()
+      where (user_id = auth.uid() or email = auth.email())
         and is_head_of_household = true
       limit 1
     )
@@ -147,11 +154,6 @@ create policy "hoh_read_own_contributions" on contributions
 
 -- Admins can manage contributions (insert/update from QB imports)
 create policy "admin_manage_contributions" on contributions
-  for all using (
-    exists (select 1 from user_roles where user_id = auth.uid() and role = 'admin')
-  );
-
-create policy "admin_manage_documents" on documents
   for all using (
     exists (select 1 from user_roles where user_id = auth.uid() and role = 'admin')
   );
@@ -175,7 +177,34 @@ create policy "admin_read_audit_log" on audit_log
   for select using (
     exists (select 1 from user_roles where user_id = auth.uid() and role = 'admin')
   );
+-- Users can read their own role (required for proxy auth check)
+create policy "users_read_own_role" on user_roles
+  for select using (auth.uid() = user_id);
+
 -- Inserts come from the service-role key (admin console API routes), not the anon client
+
+-- ============================================================
+-- App settings — single-row config table (id = 'config')
+-- ============================================================
+create table app_settings (
+  id                  text primary key,
+  google_calendar_id  text,
+  google_api_key      text,
+  church_name         text,
+  church_address      text,
+  contact_email       text
+);
+
+alter table app_settings enable row level security;
+
+-- Authenticated users can read church info; only admins can write
+create policy "auth_read_app_settings" on app_settings
+  for select using (auth.role() = 'authenticated');
+
+create policy "admin_manage_app_settings" on app_settings
+  for all using (
+    exists (select 1 from user_roles where user_id = auth.uid() and role = 'admin')
+  );
 
 -- ============================================================
 -- Storage bucket — run in Dashboard → Storage → New Bucket

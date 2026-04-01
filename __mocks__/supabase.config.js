@@ -11,8 +11,10 @@ export const supabase = {
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockResolvedValue({ data: [], error: null }),
     single: jest.fn().mockResolvedValue({ data: null, error: null }),
     update: jest.fn().mockResolvedValue({ error: null }),
+    is: jest.fn().mockReturnThis(),
   })),
   storage: {
     from: jest.fn(() => ({

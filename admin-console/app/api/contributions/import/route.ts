@@ -6,7 +6,8 @@ const MAX_ROWS = 5000;
 const MAX_BODY = 500_000; // 500 KB
 
 interface CsvRow {
-  familyName: string;
+  familyName?: string;
+  membershipId?: string;
   date: string;
   amount: string;
   category: string;
@@ -30,25 +31,31 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminSupabase();
-  const { data: families } = await supabase.from('families').select('id, family_name');
-  const familyMap = new Map<string, string>();
-  (families ?? []).forEach(f => familyMap.set(f.family_name.toLowerCase(), f.id));
+  const { data: families } = await supabase.from('families').select('id, family_name, membership_id');
+  const byMembershipId = new Map<string, string>();
+  const byFamilyName   = new Map<string, string>();
+  (families ?? []).forEach(f => {
+    if (f.membership_id) byMembershipId.set(f.membership_id.trim(), f.id);
+    byFamilyName.set(f.family_name.toLowerCase(), f.id);
+  });
 
   const toInsert = [];
   const unmatched: string[] = [];
 
   for (const row of rows) {
     // Sanitize inputs — strip control characters and limit lengths
-    const familyName = String(row.familyName ?? '').replace(/[\x00-\x1f]/g, '').slice(0, 100).trim();
-    const dateStr    = String(row.date ?? '').replace(/[^0-9\-\/]/g, '').slice(0, 10);
-    const amountStr  = String(row.amount ?? '').replace(/[^0-9.\-]/g, '').slice(0, 20);
-    const category   = String(row.category ?? '').replace(/[\x00-\x1f]/g, '').slice(0, 100).trim() || 'General Fund';
+    const membershipId = String(row.membershipId ?? '').replace(/[\x00-\x1f]/g, '').slice(0, 50).trim();
+    const familyName   = String(row.familyName ?? '').replace(/[\x00-\x1f]/g, '').slice(0, 100).trim();
+    const dateStr      = String(row.date ?? '').replace(/[^0-9\-\/]/g, '').slice(0, 10);
+    const amountStr    = String(row.amount ?? '').replace(/[^0-9.\-]/g, '').slice(0, 20);
+    const category     = String(row.category ?? '').replace(/[\x00-\x1f]/g, '').slice(0, 100).trim() || 'General Fund';
 
-    if (!familyName) continue;
+    if (!membershipId && !familyName) continue;
 
-    // Exact match only (case-insensitive) — no wildcard to prevent pattern injection
-    const familyId = familyMap.get(familyName.toLowerCase());
-    if (!familyId) { unmatched.push(familyName); continue; }
+    // Prefer membership_id lookup; fall back to family name (case-insensitive)
+    const familyId = (membershipId ? byMembershipId.get(membershipId) : undefined)
+                  ?? (familyName   ? byFamilyName.get(familyName.toLowerCase()) : undefined);
+    if (!familyId) { unmatched.push(membershipId || familyName); continue; }
 
     const amount = parseFloat(amountStr.replace(/[$,]/g, ''));
     if (isNaN(amount) || amount <= 0 || amount > 1_000_000) continue;
@@ -64,7 +71,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `No rows matched families. Check family names match exactly. Unmatched: ${sample}` }, { status: 400 });
   }
 
-  const { error } = await supabase.from('contributions').upsert(toInsert, { ignoreDuplicates: true });
+  // Delete all existing contributions before inserting — QB export is always a full YTD file
+  const { error: deleteError } = await supabase.from('contributions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  if (deleteError) return NextResponse.json({ error: 'Failed to clear existing contributions' }, { status: 500 });
+
+  const { error } = await supabase.from('contributions').insert(toInsert);
   if (error) return NextResponse.json({ error: 'Import failed' }, { status: 400 });
 
   await supabase.from('audit_log').insert({

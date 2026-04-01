@@ -56,9 +56,18 @@ describe('POST /api/users/invite', () => {
       data: { user: { id: 'new-user-id' } },
       error: null,
     });
-    mockFrom.mockReturnValue({
-      upsert: () => Promise.resolve({ data: null, error: null }),
-      insert: () => Promise.resolve({ data: null, error: null }),
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'members') {
+        return {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockResolvedValue({ count: 1, error: null }),
+          }),
+        };
+      }
+      return {
+        upsert: () => Promise.resolve({ data: null, error: null }),
+        insert: () => Promise.resolve({ data: null, error: null }),
+      };
     });
     const { checkRateLimit } = require('@/lib/rateLimit');
     checkRateLimit.mockReturnValue(true);
@@ -87,6 +96,24 @@ describe('POST /api/users/invite', () => {
 
     const res = await invitePost(makeInviteRequest({ email: 'user@example.com', role: 'member' }));
     expect(res.status).toBe(429);
+  });
+
+  it('returns 400 when email is not in the members table', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'members') {
+        return {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockResolvedValue({ count: 0, error: null }),
+          }),
+        };
+      }
+      return { insert: () => Promise.resolve({ data: null, error: null }) };
+    });
+
+    const res = await invitePost(makeInviteRequest({ email: 'outsider@example.com', role: 'member' }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toMatch(/registered member/i);
   });
 
   it('returns 400 when Supabase invite fails but does not leak internal error', async () => {

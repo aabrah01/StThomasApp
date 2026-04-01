@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     width: 4,
-    backgroundColor: theme.colors.primaryLight,
+    backgroundColor: theme.colors.accent,
     alignSelf: 'stretch',
   },
   content: {
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   },
   location: {
     fontSize: theme.fonts.sizes.xs,
-    color: theme.colors.textLight,
+    color: theme.colors.sapphire,
     fontWeight: '500',
   },
   chevron: {

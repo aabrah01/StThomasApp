@@ -72,15 +72,14 @@ describe('POST /api/families', () => {
     expect(json.error).toMatch(/required/i);
   });
 
-  it('returns 400 for invalid email', async () => {
+  it('accepts a family without a top-level email (email is not validated at this route)', async () => {
+    // The POST /api/families route does not validate a top-level email field.
+    // Email validation only applies to individual member rows.
     const res = await POST(makeRequest({
       familyName: 'Smith Family',
       membershipId: 'MEM001',
-      email: 'not-an-email',
     }));
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json.error).toMatch(/email/i);
+    expect(res.status).toBe(200);
   });
 
   it('returns 400 for invalid photoUrl protocol', async () => {

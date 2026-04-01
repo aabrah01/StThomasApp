@@ -1,75 +1,44 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, Platform, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import theme from '../../styles/theme';
 
 const ContactInfo = ({ family }) => {
-  const handleCall = () => {
-    if (family.phoneNumber) {
-      Linking.openURL(`tel:${family.phoneNumber}`);
-    }
-  };
-
-  const handleEmail = () => {
-    if (family.email) {
-      Linking.openURL(`mailto:${family.email}`);
-    }
-  };
-
   const handleAddress = () => {
     if (family.address) {
       const { street, city, state, zipCode } = family.address;
       const fullAddress = `${street}, ${city}, ${state} ${zipCode}`;
-      Linking.openURL(
-        `https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`
-      );
+      const encoded = encodeURIComponent(fullAddress);
+      const url = Platform.OS === 'ios'
+        ? `maps://?q=${encoded}`
+        : `geo:0,0?q=${encoded}`;
+      Linking.openURL(url);
     }
   };
 
+  if (!family.address) return null;
+
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Contact Information</Text>
+      <Text style={styles.sectionTitle}>Address</Text>
 
-      {family.phoneNumber && (
-        <TouchableOpacity style={styles.row} onPress={handleCall}>
-          <View style={styles.iconBox}>
-            <Text style={styles.icon}>📞</Text>
-          </View>
-          <View style={styles.rowContent}>
-            <Text style={styles.label}>Phone</Text>
-            <Text style={styles.value}>{family.phoneNumber}</Text>
-          </View>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-      )}
-
-      {family.email && (
-        <TouchableOpacity style={styles.row} onPress={handleEmail}>
-          <View style={styles.iconBox}>
-            <Text style={styles.icon}>✉️</Text>
-          </View>
-          <View style={styles.rowContent}>
-            <Text style={styles.label}>Email</Text>
-            <Text style={styles.value} numberOfLines={1}>{family.email}</Text>
-          </View>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-      )}
-
-      {family.address && (
-        <TouchableOpacity style={[styles.row, styles.lastRow]} onPress={handleAddress}>
-          <View style={styles.iconBox}>
-            <Text style={styles.icon}>📍</Text>
-          </View>
-          <View style={styles.rowContent}>
-            <Text style={styles.label}>Address</Text>
-            <Text style={styles.value}>{family.address.street}</Text>
-            <Text style={styles.value}>
-              {family.address.city}, {family.address.state} {family.address.zipCode}
-            </Text>
-          </View>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity style={styles.infoRow} onPress={handleAddress} activeOpacity={0.7}>
+        <View style={styles.iconWrap}>
+          <Ionicons name="location-outline" size={20} color={theme.colors.primary} />
+        </View>
+        <View style={styles.infoText}>
+          <Text style={styles.infoLabel}>Address</Text>
+          <Text style={styles.infoValue}>{family.address.street}</Text>
+          {family.address.street2 ? (
+            <Text style={styles.infoValue}>{family.address.street2}</Text>
+          ) : null}
+          <Text style={styles.infoValue}>
+            {[family.address.city, family.address.state].filter(Boolean).join(', ')}
+            {family.address.zipCode ? ` ${family.address.zipCode}` : ''}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={theme.colors.textLight} />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -79,52 +48,41 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: theme.fonts.sizes.md,
     fontWeight: '700',
-    color: theme.colors.text,
+    color: theme.colors.accent,
     marginBottom: theme.spacing.md,
     letterSpacing: -0.3,
   },
-  row: {
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
   },
-  lastRow: {
-    borderBottomWidth: 0,
-  },
-  iconBox: {
+  iconWrap: {
     width: 36,
     height: 36,
     borderRadius: 10,
     backgroundColor: theme.colors.surfaceSecondary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing.sm,
+    marginRight: theme.spacing.md,
   },
-  icon: {
-    fontSize: 16,
-  },
-  rowContent: {
+  infoText: {
     flex: 1,
   },
-  label: {
+  infoLabel: {
     fontSize: theme.fonts.sizes.xs,
-    color: theme.colors.textSecondary,
+    color: theme.colors.textLight,
     fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
     marginBottom: 2,
   },
-  value: {
+  infoValue: {
     fontSize: theme.fonts.sizes.md,
-    color: theme.colors.primary,
+    color: theme.colors.sapphire,
     fontWeight: '500',
-  },
-  chevron: {
-    fontSize: 22,
-    color: theme.colors.textLight,
-    marginLeft: theme.spacing.sm,
   },
 });
 

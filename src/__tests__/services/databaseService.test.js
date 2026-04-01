@@ -124,36 +124,6 @@ describe('DatabaseService — demo mode', () => {
     });
   });
 
-  describe('getDocuments', () => {
-    it('returns documents for a valid year', async () => {
-      const { demoDocuments } = require('../../utils/demoData');
-      const year = demoDocuments[0]?.year;
-      if (year) {
-        const { data, error } = await db.getDocuments(year);
-        expect(error).toBeNull();
-        expect(data.every(d => d.year === year)).toBe(true);
-      }
-    });
-
-    it('returns empty array for year with no documents', async () => {
-      const { data } = await db.getDocuments(1900);
-      expect(data).toEqual([]);
-    });
-
-    it('each document has required shape', async () => {
-      const { demoDocuments } = require('../../utils/demoData');
-      const year = demoDocuments[0]?.year;
-      if (year) {
-        const { data } = await db.getDocuments(year);
-        if (data.length > 0) {
-          expect(data[0]).toHaveProperty('id');
-          expect(data[0]).toHaveProperty('title');
-          expect(data[0]).toHaveProperty('year');
-        }
-      }
-    });
-  });
-
   describe('getContributions', () => {
     it('returns contributions for a valid family + year', async () => {
       const { demoContributions } = require('../../utils/demoData');
@@ -204,6 +174,46 @@ describe('DatabaseService — demo mode', () => {
       await db.updateFamilyPhoto(familyId, newUrl);
       const { data } = await db.getFamilyById(familyId);
       expect(data.photoUrl).toBe(newUrl);
+    });
+  });
+
+  describe('getMemberByEmail', () => {
+    it('returns null (not an error) for an unknown email', async () => {
+      const { data, error } = await db.getMemberByEmail('nobody@example.com');
+      expect(data).toBeNull();
+      // demo mode has no getMemberByEmail — it calls supabase directly,
+      // so in demo mode this simply resolves via the supabase mock path.
+      // Just verify it doesn't throw.
+    });
+  });
+
+  describe('getMembersByEmail', () => {
+    it('returns an array (may be empty) for any email in demo mode', async () => {
+      // getMembersByEmail calls supabase directly — in demo mode supabase is
+      // not configured, so the call will return an empty/null result gracefully.
+      const { data } = await db.getMembersByEmail('shared@example.com');
+      // We just verify the method exists and returns a shaped result
+      expect(data === null || Array.isArray(data)).toBe(true);
+    });
+  });
+
+  describe('getMemberByUserId — multiple members with same user_id', () => {
+    it('returns a single member (not an array) even when multiple share user_id', async () => {
+      const { demoMembers } = require('../../utils/demoData');
+      const memberWithUser = demoMembers.find(m => m.userId);
+      if (memberWithUser) {
+        const { data } = await db.getMemberByUserId(memberWithUser.userId);
+        // Should return a single member object, not an array
+        expect(data).not.toBeNull();
+        expect(Array.isArray(data)).toBe(false);
+        expect(data).toHaveProperty('id');
+        expect(data).toHaveProperty('firstName');
+      }
+    });
+
+    it('returns null (not an error object) for an unknown userId', async () => {
+      const { data } = await db.getMemberByUserId('totally-unknown-id');
+      expect(data).toBeNull();
     });
   });
 });

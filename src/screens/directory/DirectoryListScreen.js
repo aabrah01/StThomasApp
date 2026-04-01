@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import databaseService from '../../services/databaseService';
@@ -17,12 +17,12 @@ import ErrorMessage from '../../components/common/ErrorMessage';
 import theme from '../../styles/theme';
 import commonStyles from '../../styles/commonStyles';
 
-const NUM_COLUMNS = 2;
 const CARD_MARGIN = theme.spacing.sm;
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const CARD_WIDTH = (SCREEN_WIDTH - theme.spacing.md * 2 - CARD_MARGIN) / NUM_COLUMNS;
 
 const DirectoryListScreen = ({ navigation }) => {
+  const { width } = useWindowDimensions();
+  const numColumns = width >= 1024 ? 4 : width >= 768 ? 3 : 2;
+  const cardWidth = (width - theme.spacing.md * 2 - CARD_MARGIN * (numColumns - 1)) / numColumns;
   const [families, setFamilies] = useState([]);
   const [filteredFamilies, setFilteredFamilies] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,7 +44,10 @@ const DirectoryListScreen = ({ navigation }) => {
     if (fetchError) {
       setError(fetchError);
     } else {
-      setFamilies(data || []);
+      const sorted = (data || []).slice().sort((a, b) =>
+        (a.membershipId || '').localeCompare(b.membershipId || '', undefined, { numeric: true })
+      );
+      setFamilies(sorted);
     }
     setLoading(false);
     setRefreshing(false);
@@ -56,8 +59,17 @@ const DirectoryListScreen = ({ navigation }) => {
       return;
     }
     const query = searchQuery.toLowerCase();
+    const queryDigits = query.replace(/\D/g, '');
     setFilteredFamilies(
-      families.filter((f) => f.familyName.toLowerCase().includes(query))
+      families.filter((f) =>
+        f.familyName.toLowerCase().includes(query) ||
+        (f.memberFirstNames && f.memberFirstNames.some(n => n.toLowerCase().includes(query))) ||
+        (f.membershipId && f.membershipId.toLowerCase().includes(query)) ||
+        (f.memberPhoneNumbers && f.memberPhoneNumbers.some(p =>
+          p.toLowerCase().includes(query) ||
+          (queryDigits && p.replace(/\D/g, '').includes(queryDigits))
+        ))
+      )
     );
   };
 
@@ -76,7 +88,7 @@ const DirectoryListScreen = ({ navigation }) => {
         <Ionicons name="search" size={18} color={theme.colors.textLight} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search families..."
+          placeholder="Search by name or membership ID..."
           placeholderTextColor={theme.colors.textLight}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -101,11 +113,12 @@ const DirectoryListScreen = ({ navigation }) => {
         <FlatList
           data={filteredFamilies}
           keyExtractor={(item) => item.id}
-          numColumns={NUM_COLUMNS}
+          key={numColumns}
+          numColumns={numColumns}
           renderItem={({ item }) => (
             <FamilyCard
               family={item}
-              cardWidth={CARD_WIDTH}
+              cardWidth={cardWidth}
               onPress={() => navigation.navigate('FamilyDetail', { familyId: item.id })}
             />
           )}
