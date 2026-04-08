@@ -55,7 +55,7 @@ export default async function UsersPage() {
       .map(m => ({
           email: m.email!,
           name: `${m.first_name} ${m.last_name}`,
-          membershipId: (m.families as { membership_id: string } | null)?.membership_id ?? null,
+          membershipId: (m.families as unknown as { membership_id: string } | null)?.membership_id ?? null,
         }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
