@@ -131,7 +131,7 @@ export default function MemberImportPage() {
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
           <div
             onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-[#C8102E] hover:bg-gray-50 transition-colors"
+            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-[#2B5CE6] hover:bg-gray-50 transition-colors"
           >
             <div className="text-3xl mb-2">📄</div>
             <p className="text-sm font-medium text-gray-700">
@@ -197,7 +197,7 @@ export default function MemberImportPage() {
             <button
               onClick={handleImport}
               disabled={loading}
-              className="bg-[#C8102E] text-white text-sm font-semibold px-6 py-2 rounded-lg hover:bg-[#9B0020] transition-colors disabled:opacity-60"
+              className="bg-[#2B5CE6] text-white text-sm font-semibold px-6 py-2 rounded-lg hover:bg-[#1E47C8] transition-colors disabled:opacity-60"
             >
               {loading ? 'Importing...' : `Import ${preview.totalMembers} Members`}
             </button>
@@ -247,7 +247,7 @@ export default function MemberImportPage() {
           <div className="flex gap-3">
             <Link
               href="/members"
-              className="bg-[#C8102E] text-white text-sm font-semibold px-6 py-2 rounded-lg hover:bg-[#9B0020] transition-colors"
+              className="bg-[#2B5CE6] text-white text-sm font-semibold px-6 py-2 rounded-lg hover:bg-[#1E47C8] transition-colors"
             >
               View Members
             </Link>

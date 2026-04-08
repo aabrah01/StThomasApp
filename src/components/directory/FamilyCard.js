@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
   placeholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: theme.colors.primaryDark,
+    backgroundColor: theme.colors.sapphire,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -70,13 +70,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   familyName: {
-    fontSize: theme.fonts.sizes.sm,
+    fontSize: theme.fonts.sizes.lg,
     fontWeight: '700',
     color: theme.colors.text,
     marginBottom: 2,
   },
   hohNames: {
-    fontSize: theme.fonts.sizes.xs,
+    fontSize: theme.fonts.sizes.md,
     color: theme.colors.accent,
     fontWeight: '600',
   },

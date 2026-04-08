@@ -1,14 +1,14 @@
 export const theme = {
   colors: {
-    primary: '#C8102E',        // liturgical red (logo background)
-    primaryLight: '#E03348',   // lighter red for hover/active states
-    primaryDark: '#8B000D',    // deep red for pressed states
-    accent: '#C9A227',         // ornate gold (logo cross)
-    accentLight: '#E6C55A',    // lighter gold
-    sapphire: '#1A4FC4',       // sapphire blue (logo jewels)
-    background: '#FFFCF5',     // warm white with subtle gold tint
+    primary: '#FFFFFF',        // white (main surfaces, backgrounds)
+    primaryLight: '#EEF2FF',   // light blue tint for subtle highlights
+    primaryDark: '#CBD5E1',    // cool light gray for placeholders
+    accent: '#C9A84C',         // warm gold (ornate cross)
+    accentLight: '#E8C96A',    // soft gold
+    sapphire: '#2B5CE6',       // royal blue (interactive elements)
+    background: '#F8F7F4',     // off-white with subtle warm tint
     surface: '#FFFFFF',
-    surfaceSecondary: '#FFF5E0', // very light gold tint
+    surfaceSecondary: '#F0EFE8', // light warm secondary surface
     text: '#111827',
     textSecondary: '#6B7280',
     textLight: '#9CA3AF',

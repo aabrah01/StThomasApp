@@ -18,7 +18,7 @@ type SortDir = 'asc' | 'desc';
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   return (
-    <span className={`ml-1 inline-block ${active ? 'text-[#C9A227]' : 'text-gray-300'}`}>
+    <span className={`ml-1 inline-block ${active ? 'text-[#8B6400]' : 'text-gray-300'}`}>
       {active && dir === 'desc' ? '↓' : '↑'}
     </span>
   );
@@ -73,11 +73,11 @@ export function FamiliesClient({ families }: { families: Family[] }) {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search by name or membership ID…"
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]"
           />
           <Link
             href="/families/new"
-            className="bg-[#C8102E] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#9B0020] transition-colors whitespace-nowrap"
+            className="bg-[#2B5CE6] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#1E47C8] transition-colors whitespace-nowrap"
           >
             + Add Family
           </Link>
@@ -106,7 +106,7 @@ export function FamiliesClient({ families }: { families: Family[] }) {
                 <td colSpan={3} className="px-4 py-10 text-center text-gray-400">
                   {search
                     ? `No families match "${search}".`
-                    : <>No families yet. <Link href="/families/new" className="text-[#C8102E] hover:underline">Add the first one.</Link></>}
+                    : <>No families yet. <Link href="/families/new" className="text-[#2B5CE6] hover:underline">Add the first one.</Link></>}
                 </td>
               </tr>
             )}

@@ -155,13 +155,13 @@ const ProfileScreen = ({ navigation }) => {
               </TouchableOpacity>
             )}
 
-            {family && (
+            {family && (isAdmin() || member?.isHeadOfHousehold) && (
               <TouchableOpacity style={styles.row} onPress={handleUploadFamilyPhoto} disabled={uploadingPhoto}>
                 <View style={styles.iconBox}>
                   {family.photoUrl ? (
                     <Image source={{ uri: family.photoUrl }} style={styles.familyPhotoThumb} />
                   ) : (
-                    <Ionicons name="camera-outline" size={18} color={theme.colors.primary} />
+                    <Ionicons name="camera-outline" size={18} color={theme.colors.sapphire} />
                   )}
                 </View>
                 <View style={styles.rowContent}>
@@ -169,7 +169,7 @@ const ProfileScreen = ({ navigation }) => {
                   <Text style={styles.rowValue}>{family.photoUrl ? 'Update photo' : 'Add a photo'}</Text>
                 </View>
                 {uploadingPhoto
-                  ? <ActivityIndicator size="small" color={theme.colors.primary} />
+                  ? <ActivityIndicator size="small" color={theme.colors.sapphire} />
                   : <Ionicons name="chevron-forward" size={16} color={theme.colors.textLight} />}
               </TouchableOpacity>
             )}
@@ -216,7 +216,7 @@ const ProfileScreen = ({ navigation }) => {
               {/* Total rollup */}
               <View style={styles.row}>
                 <View style={[styles.iconBox, styles.givingIconBox]}>
-                  <Ionicons name="heart-outline" size={18} color={theme.colors.primary} />
+                  <Ionicons name="heart-outline" size={18} color={theme.colors.sapphire} />
                 </View>
                 <View style={styles.rowContent}>
                   <Text style={styles.rowLabel}>Total Contributions</Text>
@@ -276,7 +276,7 @@ const ProfileScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.sapphire,
     alignItems: 'center',
     paddingTop: theme.spacing.xl,
     paddingBottom: theme.spacing.xxl,
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceSecondary,
   },
   ytdAmount: {
-    color: theme.colors.primary,
+    color: theme.colors.sapphire,
     fontWeight: '700',
     fontSize: theme.fonts.sizes.lg,
   },
@@ -419,11 +419,11 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: theme.colors.error,
+    borderColor: theme.colors.border,
     ...theme.shadows.sm,
   },
   logoutText: {
-    color: theme.colors.error,
+    color: theme.colors.textSecondary,
     fontSize: theme.fonts.sizes.md,
     fontWeight: '700',
   },

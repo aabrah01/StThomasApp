@@ -184,11 +184,11 @@ export default function ContributionsClient({ contributions: initial, families }
           <div className="flex items-center gap-3">
             <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Contribution Date</label>
             <input type="date" value={importDate} onChange={e => setImportDate(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]" />
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]" />
             <span className="text-xs text-gray-400">Used for Excel imports (no date in file)</span>
           </div>
           <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileParse}
-            className="text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#C8102E] file:text-white hover:file:bg-[#9B0020]" />
+            className="text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#2B5CE6] file:text-white hover:file:bg-[#1E47C8]" />
 
           {csvRows.length > 0 && (
             <>
@@ -226,7 +226,7 @@ export default function ContributionsClient({ contributions: initial, families }
               )}
               <div className="flex gap-3">
                 <button onClick={handleImport} disabled={importing}
-                  className="bg-[#C8102E] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#9B0020] transition-colors disabled:opacity-50">
+                  className="bg-[#2B5CE6] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#1E47C8] transition-colors disabled:opacity-50">
                   {importing ? 'Importing…' : `Import ${csvRows.length} Rows`}
                 </button>
                 <button onClick={() => { setCsvRows([]); setImportResult(''); }} disabled={importing}
@@ -251,7 +251,7 @@ export default function ContributionsClient({ contributions: initial, families }
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Family *</label>
               <select value={manualFamilyId} onChange={e => setManualFamilyId(e.target.value)} required
-                className="w-full border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]">
+                className="w-full border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]">
                 <option value="">Select…</option>
                 {families.map(f => <option key={f.id} value={f.id}>{f.name}{f.membershipId ? ` — ${f.membershipId}` : ''}</option>)}
               </select>
@@ -259,21 +259,21 @@ export default function ContributionsClient({ contributions: initial, families }
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Date *</label>
               <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]" />
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Amount *</label>
               <input type="number" step="0.01" min="0" value={manualAmount} onChange={e => setManualAmount(e.target.value)} required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]" />
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Category</label>
               <input value={manualCategory} onChange={e => setManualCategory(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]" />
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]" />
             </div>
             <div className="md:col-span-4 flex justify-end">
               <button type="submit" disabled={saving}
-                className="bg-[#C8102E] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#9B0020] transition-colors disabled:opacity-50">
+                className="bg-[#2B5CE6] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#1E47C8] transition-colors disabled:opacity-50">
                 {saving ? 'Saving…' : 'Add Contribution'}
               </button>
             </div>
@@ -296,9 +296,9 @@ export default function ContributionsClient({ contributions: initial, families }
             placeholder="Search by name, ID or category…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 h-[30px] text-sm w-64 focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+            className="border border-gray-300 rounded-lg px-3 h-[30px] text-sm w-64 focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]"
           />
-          <span className="text-sm font-semibold text-[#C9A227] whitespace-nowrap">
+          <span className="text-sm font-semibold text-[#8B6400] whitespace-nowrap">
             YTD: ${ytdTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </span>
           <div className="flex gap-2 ml-auto">
@@ -307,7 +307,7 @@ export default function ContributionsClient({ contributions: initial, families }
               Import
             </button>
             <button onClick={() => setPanel(panel === 'manual' ? null : 'manual')}
-              className="text-sm font-semibold px-3 py-1.5 rounded-lg bg-[#C8102E] text-white hover:bg-[#9B0020] transition-colors">
+              className="text-sm font-semibold px-3 py-1.5 rounded-lg bg-[#2B5CE6] text-white hover:bg-[#1E47C8] transition-colors">
               + Add Entry
             </button>
           </div>

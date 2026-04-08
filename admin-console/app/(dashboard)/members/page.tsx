@@ -51,7 +51,7 @@ export default async function MembersPage() {
         </div>
         <Link
           href="/members/import"
-          className="bg-[#C8102E] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#9B0020] transition-colors"
+          className="bg-[#2B5CE6] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#1E47C8] transition-colors"
         >
           Import CSV
         </Link>

@@ -21,27 +21,35 @@ const MemberList = ({ members }) => {
             <Avatar
               source={member.photoUrl}
               name={`${member.firstName} ${member.lastName}`}
-              size={44}
+              size={52}
             />
             <View style={styles.memberInfo}>
               <Text style={styles.memberName}>
                 {member.firstName} {member.lastName}
               </Text>
-              <View style={styles.roleBadge}>
-                <Text style={styles.memberRole}>{member.role}</Text>
-              </View>
-            </View>
-            <View style={styles.contactDetails}>
+              {member.role ? (
+                <View style={styles.roleBadge}>
+                  <Text style={styles.memberRole}>{member.role}</Text>
+                </View>
+              ) : null}
               {member.email ? (
-                <TouchableOpacity onPress={() => Linking.openURL(`mailto:${member.email}`)}>
-                  <Text style={[styles.memberContact, styles.emailLink]} numberOfLines={1}>
+                <TouchableOpacity
+                  onPress={() => Linking.openURL(`mailto:${member.email}`)}
+                  style={styles.contactRow}
+                >
+                  <Text style={[styles.memberContact, styles.emailLink]}>
                     {member.email}
                   </Text>
                 </TouchableOpacity>
               ) : null}
               {member.phoneNumber ? (
-                <TouchableOpacity onPress={() => Linking.openURL(`tel:${member.phoneNumber}`)}>
-                  <Text style={[styles.memberContact, styles.phoneLink]}>{member.phoneNumber}</Text>
+                <TouchableOpacity
+                  onPress={() => Linking.openURL(`tel:${member.phoneNumber}`)}
+                  style={styles.contactRow}
+                >
+                  <Text style={[styles.memberContact, styles.phoneLink]}>
+                    {member.phoneNumber}
+                  </Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -56,7 +64,7 @@ const MemberList = ({ members }) => {
 const styles = StyleSheet.create({
   container: {},
   sectionTitle: {
-    fontSize: theme.fonts.sizes.md,
+    fontSize: theme.fonts.sizes.lg,
     fontWeight: '700',
     color: theme.colors.accent,
     marginBottom: theme.spacing.md,
@@ -64,18 +72,18 @@ const styles = StyleSheet.create({
   },
   memberRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: theme.spacing.sm,
   },
   memberInfo: {
+    flex: 1,
     marginLeft: theme.spacing.sm,
-    minWidth: 100,
   },
   memberName: {
-    fontSize: theme.fonts.sizes.md,
+    fontSize: theme.fonts.sizes.lg,
     fontWeight: '600',
     color: theme.colors.text,
-    marginBottom: 3,
+    marginBottom: 4,
   },
   roleBadge: {
     alignSelf: 'flex-start',
@@ -85,20 +93,17 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.round,
   },
   memberRole: {
-    fontSize: theme.fonts.sizes.xs,
-    color: theme.colors.primary,
+    fontSize: theme.fonts.sizes.sm,
+    color: theme.colors.sapphire,
     textTransform: 'capitalize',
     fontWeight: '600',
   },
-  contactDetails: {
-    flex: 1,
-    alignItems: 'flex-end',
+  contactRow: {
+    marginTop: 5,
   },
   memberContact: {
     fontSize: theme.fonts.sizes.md,
     color: theme.colors.textSecondary,
-    textAlign: 'right',
-    marginBottom: 2,
   },
   emailLink: {
     color: theme.colors.sapphire,
@@ -115,7 +120,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: theme.fonts.sizes.md,
+    fontSize: theme.fonts.sizes.lg,
     color: theme.colors.textSecondary,
   },
 });

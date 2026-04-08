@@ -59,7 +59,11 @@ const FamilyDetailScreen = ({ route, navigation }) => {
     }
 
     if (!membersResult.error) {
-      setMembers(membersResult.data || []);
+      const sorted = (membersResult.data || []).slice().sort((a, b) => {
+        if (a.isHeadOfHousehold === b.isHeadOfHousehold) return 0;
+        return a.isHeadOfHousehold ? -1 : 1;
+      });
+      setMembers(sorted);
     }
 
     if (isAdmin() && contribResult?.data) {
@@ -151,7 +155,7 @@ const FamilyDetailScreen = ({ route, navigation }) => {
           <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
         </TouchableOpacity>
 
-        {isAdmin() && (
+        {(isAdmin() || currentMember?.isHeadOfHousehold && currentMember?.familyId === familyId) && (
           <TouchableOpacity
             style={styles.editPhotoButton}
             onPress={handleEditPhoto}
@@ -186,7 +190,7 @@ const FamilyDetailScreen = ({ route, navigation }) => {
               {/* Total rollup */}
               <View style={styles.contribRow}>
                 <View style={styles.contribIconBox}>
-                  <Ionicons name="heart-outline" size={18} color={theme.colors.primary} />
+                  <Ionicons name="heart-outline" size={18} color={theme.colors.sapphire} />
                 </View>
                 <View style={styles.contribContent}>
                   <Text style={styles.contribLabel}>Total Contributions</Text>
@@ -245,7 +249,7 @@ const styles = StyleSheet.create({
   photoPlaceholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.sapphire,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
+  Keyboard,
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -119,16 +120,18 @@ const DirectoryListScreen = ({ navigation }) => {
             <FamilyCard
               family={item}
               cardWidth={cardWidth}
-              onPress={() => navigation.navigate('FamilyDetail', { familyId: item.id })}
+              onPress={() => { Keyboard.dismiss(); navigation.navigate('FamilyDetail', { familyId: item.id }); }}
             />
           )}
           contentContainerStyle={styles.grid}
           columnWrapperStyle={styles.row}
+          onScrollBeginDrag={Keyboard.dismiss}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor={theme.colors.primary}
+              tintColor={theme.colors.sapphire}
             />
           }
         />

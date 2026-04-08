@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "St. Thomas Directory",
+    "name": "StThomasLI",
     "slug": "st-thomas-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F8F7F4"
     },
     "assetBundlePatterns": [
       "**/*"

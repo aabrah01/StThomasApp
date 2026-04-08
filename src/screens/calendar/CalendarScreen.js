@@ -115,14 +115,14 @@ const CalendarScreen = ({ navigation }) => {
       const date = event.startDate.split('T')[0];
       marked[date] = {
         marked: true,
-        dotColor: theme.colors.primaryLight,
+        dotColor: theme.colors.sapphire,
       };
     });
 
     marked[selectedDate] = {
       ...marked[selectedDate],
       selected: true,
-      selectedColor: theme.colors.primary,
+      selectedColor: theme.colors.sapphire,
     };
 
     setMarkedDates(marked);
@@ -164,12 +164,12 @@ const CalendarScreen = ({ navigation }) => {
         theme={{
           backgroundColor: theme.colors.surface,
           calendarBackground: theme.colors.surface,
-          selectedDayBackgroundColor: theme.colors.primary,
+          selectedDayBackgroundColor: theme.colors.sapphire,
           selectedDayTextColor: '#FFFFFF',
-          todayTextColor: theme.colors.primary,
-          todayBackgroundColor: theme.colors.surfaceSecondary,
-          dotColor: theme.colors.primaryLight,
-          arrowColor: theme.colors.primary,
+          todayTextColor: theme.colors.sapphire,
+          todayBackgroundColor: theme.colors.primaryLight,
+          dotColor: theme.colors.sapphire,
+          arrowColor: theme.colors.sapphire,
           monthTextColor: theme.colors.text,
           textDayFontWeight: '500',
           textMonthFontWeight: '700',
@@ -184,7 +184,7 @@ const CalendarScreen = ({ navigation }) => {
       {monthLoading && (
         <ActivityIndicator
           size="small"
-          color={theme.colors.primary}
+          color={theme.colors.sapphire}
           style={styles.monthLoader}
         />
       )}
@@ -219,7 +219,7 @@ const CalendarScreen = ({ navigation }) => {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
-                tintColor={theme.colors.primary}
+                tintColor={theme.colors.sapphire}
               />
             }
           />
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   countBadge: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.sapphire,
     width: 22,
     height: 22,
     borderRadius: 11,

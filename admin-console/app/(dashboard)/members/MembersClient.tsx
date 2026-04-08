@@ -21,7 +21,7 @@ type SortDir = 'asc' | 'desc';
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   return (
-    <span className={`ml-1 inline-block ${active ? 'text-[#C9A227]' : 'text-gray-300'}`}>
+    <span className={`ml-1 inline-block ${active ? 'text-[#8B6400]' : 'text-gray-300'}`}>
       {active && dir === 'desc' ? '↓' : '↑'}
     </span>
   );
@@ -72,7 +72,7 @@ export default function MembersClient({ members }: { members: Member[] }) {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search members…"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]"
         />
       </div>
 
@@ -104,7 +104,7 @@ export default function MembersClient({ members }: { members: Member[] }) {
               <tr key={m.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium text-gray-900">{m.firstName} {m.lastName}</td>
                 <td className="px-4 py-3">
-                  <Link href={`/families/${m.familyId}`} className="text-[#1A4FC4] hover:underline">
+                  <Link href={`/families/${m.familyId}`} className="text-[#2B5CE6] hover:underline">
                     {m.familyName}
                   </Link>
                 </td>

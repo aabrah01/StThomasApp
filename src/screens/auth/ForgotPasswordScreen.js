@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: theme.fonts.sizes.xxxl,
     fontWeight: 'bold',
-    color: theme.colors.primary,
+    color: theme.colors.sapphire,
     marginBottom: theme.spacing.sm,
   },
   subtitle: {
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
   },
   backButtonText: {
-    color: theme.colors.primary,
+    color: theme.colors.sapphire,
     fontSize: theme.fonts.sizes.sm,
   },
 });

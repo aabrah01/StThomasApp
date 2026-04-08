@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   placeholder: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.sapphire,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import theme from '../../styles/theme';
@@ -18,6 +19,7 @@ import commonStyles from '../../styles/commonStyles';
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, authError } = useAuth();
@@ -78,18 +80,31 @@ const LoginScreen = ({ navigation }) => {
 
           <View style={styles.inputGroup}>
             <Text style={commonStyles.inputLabel}>Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your password"
-              placeholderTextColor={theme.colors.textLight}
-              ref={passwordRef}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              returnKeyType="go"
-              onSubmitEditing={handleLogin}
-              editable={!loading}
-            />
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Enter your password"
+                placeholderTextColor={theme.colors.textLight}
+                ref={passwordRef}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                returnKeyType="go"
+                onSubmitEditing={handleLogin}
+                editable={!loading}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword(p => !p)}
+                style={styles.eyeButton}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={theme.colors.textLight}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <ErrorMessage message={error || authError} />
@@ -120,7 +135,7 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -139,7 +154,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: theme.fonts.sizes.xxl,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: theme.colors.text,
     letterSpacing: -0.3,
     textAlign: 'center',
     lineHeight: 32,
@@ -173,12 +188,29 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     paddingVertical: 13,
     paddingHorizontal: theme.spacing.md,
-    fontSize: theme.fonts.sizes.md,
+    fontSize: theme.fonts.sizes.lg,
     color: theme.colors.text,
     marginTop: 4,
   },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceSecondary,
+    borderRadius: theme.borderRadius.md,
+    marginTop: 4,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 13,
+    paddingHorizontal: theme.spacing.md,
+    fontSize: theme.fonts.sizes.lg,
+    color: theme.colors.text,
+  },
+  eyeButton: {
+    paddingHorizontal: theme.spacing.md,
+  },
   loginButton: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.sapphire,
     paddingVertical: 15,
     borderRadius: theme.borderRadius.round,
     alignItems: 'center',
@@ -200,7 +232,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
   },
   forgotText: {
-    color: theme.colors.primary,
+    color: theme.colors.sapphire,
     fontSize: theme.fonts.sizes.sm,
     fontWeight: '600',
   },

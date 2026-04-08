@@ -11,7 +11,7 @@ export default async function UsersPage() {
     id: string; email: string; role: string; lastSignIn: string | null;
     memberId: string | null; memberName: string | null; isHoh: boolean;
   }[];
-  let eligibleMembers: { email: string; name: string }[];
+  let eligibleMembers: { email: string; name: string; membershipId: string | null }[];
 
   if (DEMO_MODE) {
     rows = DEMO_USERS.map(u => ({ ...u, memberId: null, memberName: null, isHoh: false }));
@@ -21,7 +21,7 @@ export default async function UsersPage() {
     const [{ data: { users } }, { data: roles }, { data: members }] = await Promise.all([
       supabase.auth.admin.listUsers(),
       supabase.from('user_roles').select('*'),
-      supabase.from('members').select('id, first_name, last_name, email, is_head_of_household'),
+      supabase.from('members').select('id, first_name, last_name, email, is_head_of_household, families(membership_id)'),
     ]);
     const roleMap = new Map((roles ?? []).map(r => [r.user_id, r.role]));
     const memberByEmail = new Map(
@@ -52,7 +52,11 @@ export default async function UsersPage() {
         seenEmails.add(key);
         return true;
       })
-      .map(m => ({ email: m.email!, name: `${m.first_name} ${m.last_name}` }))
+      .map(m => ({
+          email: m.email!,
+          name: `${m.first_name} ${m.last_name}`,
+          membershipId: (m.families as { membership_id: string } | null)?.membership_id ?? null,
+        }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 

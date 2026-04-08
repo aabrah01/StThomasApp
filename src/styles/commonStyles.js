@@ -66,7 +66,7 @@ export const commonStyles = StyleSheet.create({
   },
 
   button: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.sapphire,
     paddingVertical: 15,
     paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.borderRadius.round,
@@ -97,13 +97,13 @@ export const commonStyles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.borderRadius.round,
     borderWidth: 1.5,
-    borderColor: theme.colors.primary,
+    borderColor: theme.colors.sapphire,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   buttonOutlineText: {
-    color: theme.colors.primary,
+    color: theme.colors.sapphire,
     fontSize: theme.fonts.sizes.md,
     fontWeight: '600',
   },

@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     ...theme.shadows.sm,
   },
   timeColumn: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.sapphire,
     width: 72,
     alignSelf: 'stretch',
     alignItems: 'center',

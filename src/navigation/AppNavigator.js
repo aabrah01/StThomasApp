@@ -28,9 +28,11 @@ const TabIcon = ({ name, focused }) => (
 );
 
 const HEADER_STYLE = {
-  backgroundColor: theme.colors.primary,
+  backgroundColor: theme.colors.surface,
   shadowColor: 'transparent',
   elevation: 0,
+  borderBottomWidth: 1,
+  borderBottomColor: theme.colors.border,
 };
 
 const HEADER_TITLE_STYLE = {
@@ -59,7 +61,7 @@ const MainTabs = () => {
           marginTop: 2,
         },
         headerStyle: HEADER_STYLE,
-        headerTintColor: '#FFFFFF',
+        headerTintColor: theme.colors.text,
         headerTitleStyle: HEADER_TITLE_STYLE,
       }}
     >

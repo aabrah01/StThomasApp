@@ -55,18 +55,59 @@ export default function FamilyForm({ family }: Props) {
     setEditingMembers(false);
   };
 
+  // ── photo helpers ─────────────────────────────────────────────────────────
+  const extractStoragePath = (url: string) =>
+    url.split(`/storage/v1/object/public/${BUCKET}/`)[1] ?? null;
+
+  const deleteStoragePhoto = async (url: string) => {
+    const path = extractStoragePath(url);
+    if (!path) return;
+    const supabase = createBrowserSupabase();
+    await supabase.storage.from(BUCKET).remove([path]);
+  };
+
   // ── photo upload ──────────────────────────────────────────────────────────
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingPhoto(true);
     const supabase = createBrowserSupabase();
+
+    // Delete old photo from storage before uploading a new one
+    if (photoUrl) {
+      await deleteStoragePhoto(photoUrl);
+    }
+
     const path = `${family?.id ?? 'new'}/family-${Date.now()}.jpg`;
     const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true });
     if (uploadErr) { setError(uploadErr.message); setUploadingPhoto(false); return; }
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    setPhotoUrl(data.publicUrl);
+    const url = data.publicUrl;
+    setPhotoUrl(url);
+    // Immediately persist the photo URL to the database for existing families
+    if (!isNew && family?.id) {
+      await fetch(`/api/families/${family.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ familyName, membershipId, address, address2, city, state, zip, photoUrl: url, members }),
+      });
+    }
     setUploadingPhoto(false);
+  };
+
+  const handleRemovePhoto = async () => {
+    // Delete the photo from storage
+    if (photoUrl) {
+      await deleteStoragePhoto(photoUrl);
+    }
+    setPhotoUrl('');
+    if (!isNew && family?.id) {
+      await fetch(`/api/families/${family.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ familyName, membershipId, address, address2, city, state, zip, photoUrl: '', members }),
+      });
+    }
   };
 
   // ── member helpers ────────────────────────────────────────────────────────
@@ -116,23 +157,21 @@ export default function FamilyForm({ family }: Props) {
         <div className="flex items-center gap-4">
           {photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={photoUrl} alt="Family" className="w-20 h-20 rounded-xl object-cover" />
+            <img src={photoUrl} alt="Family" className="w-36 h-36 rounded-xl object-cover" />
           ) : (
-            <div className="w-20 h-20 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 text-2xl">📷</div>
+            <div className="w-36 h-36 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 text-2xl">📷</div>
           )}
-          {editingDetails && (
-            <div>
-              <button type="button" onClick={() => fileRef.current?.click()}
-                className="bg-gray-100 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
-                {uploadingPhoto ? 'Uploading…' : photoUrl ? 'Change Photo' : 'Upload Photo'}
-              </button>
-              {photoUrl && (
-                <button type="button" onClick={() => setPhotoUrl('')}
-                  className="ml-2 text-red-500 text-sm hover:underline">Remove</button>
-              )}
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-            </div>
-          )}
+          <div>
+            <button type="button" onClick={() => fileRef.current?.click()}
+              className="bg-gray-100 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
+              {uploadingPhoto ? 'Uploading…' : photoUrl ? 'Change Photo' : 'Upload Photo'}
+            </button>
+            {photoUrl && (
+              <button type="button" onClick={handleRemovePhoto}
+                className="ml-2 text-red-500 text-sm hover:underline">Remove</button>
+            )}
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+          </div>
         </div>
       </div>
 
@@ -142,7 +181,7 @@ export default function FamilyForm({ family }: Props) {
           <h2 className="font-semibold text-gray-900">Family Details</h2>
           {!isNew && !editingDetails && (
             <button type="button" onClick={() => setEditingDetails(true)}
-              className="flex items-center gap-1.5 text-sm font-medium text-[#C8102E] hover:text-[#9B0020] transition-colors">
+              className="flex items-center gap-1.5 text-sm font-medium text-[#2B5CE6] hover:text-[#1E47C8] transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H8v-2.414a2 2 0 01.586-1.414z" />
               </svg>
@@ -157,38 +196,38 @@ export default function FamilyForm({ family }: Props) {
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Family Name *</label>
                 <input value={familyName} onChange={e => setFamilyName(e.target.value)} required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Membership ID *</label>
                 <input value={membershipId} onChange={e => setMembershipId(e.target.value)} required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]" />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Address Line 1</label>
                 <input value={address} onChange={e => setAddress(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]" />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Address Line 2</label>
                 <input value={address2} onChange={e => setAddress2(e.target.value)} placeholder="Apt, suite, unit, etc."
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">City</label>
                 <input value={city} onChange={e => setCity(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">State</label>
                   <input value={state} onChange={e => setState(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]" />
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Zip Code</label>
                   <input value={zip} onChange={e => setZip(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]" />
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]" />
                 </div>
               </div>
             </div>
@@ -207,7 +246,7 @@ export default function FamilyForm({ family }: Props) {
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-gray-900">{familyName || <span className="text-gray-300 font-normal italic">—</span>}</p>
               {membershipId && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-[#C9A227]/10 text-[#C9A227] border border-[#C9A227]/20 tracking-wide">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-[#C9A84C]/10 text-[#8B6400] border border-[#C9A84C]/20 tracking-wide">
                   ID: {membershipId}
                 </span>
               )}
@@ -243,7 +282,7 @@ export default function FamilyForm({ family }: Props) {
           <h2 className="font-semibold text-gray-900">Members</h2>
           {!isNew && !editingMembers ? (
             <button type="button" onClick={() => setEditingMembers(true)}
-              className="flex items-center gap-1.5 text-sm font-medium text-[#C8102E] hover:text-[#9B0020] transition-colors">
+              className="flex items-center gap-1.5 text-sm font-medium text-[#2B5CE6] hover:text-[#1E47C8] transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H8v-2.414a2 2 0 01.586-1.414z" />
               </svg>
@@ -251,10 +290,10 @@ export default function FamilyForm({ family }: Props) {
             </button>
           ) : editingMembers && !isNew ? (
             <button type="button" onClick={addMember}
-              className="text-[#C9A227] text-sm font-medium hover:underline">+ Add Member</button>
+              className="text-[#8B6400] text-sm font-medium hover:underline">+ Add Member</button>
           ) : (
             <button type="button" onClick={addMember}
-              className="text-[#C9A227] text-sm font-medium hover:underline">+ Add Member</button>
+              className="text-[#8B6400] text-sm font-medium hover:underline">+ Add Member</button>
           )}
         </div>
 
@@ -271,7 +310,7 @@ export default function FamilyForm({ family }: Props) {
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-gray-900">{m.firstName} {m.lastName}</p>
                       {m.isHeadOfHousehold && (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-[#C8102E] border border-red-100 tracking-wide">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-[#2B5CE6]/10 text-[#2B5CE6] border border-[#2B5CE6]/20 tracking-wide">
                           HOH
                         </span>
                       )}
@@ -310,17 +349,17 @@ export default function FamilyForm({ family }: Props) {
                   <div className="col-span-2">
                     <label className="block text-xs text-gray-500 mb-1">First Name</label>
                     <input value={member.firstName ?? ''} onChange={e => updateMember(i, 'firstName', e.target.value)}
-                      className="w-full border border-gray-300 rounded px-2 h-8 text-sm focus:outline-none focus:ring-1 focus:ring-[#C8102E]" />
+                      className="w-full border border-gray-300 rounded px-2 h-8 text-sm focus:outline-none focus:ring-1 focus:ring-[#2B5CE6]" />
                   </div>
                   <div className="col-span-2">
                     <label className="block text-xs text-gray-500 mb-1">Last Name</label>
                     <input value={member.lastName ?? ''} onChange={e => updateMember(i, 'lastName', e.target.value)}
-                      className="w-full border border-gray-300 rounded px-2 h-8 text-sm focus:outline-none focus:ring-1 focus:ring-[#C8102E]" />
+                      className="w-full border border-gray-300 rounded px-2 h-8 text-sm focus:outline-none focus:ring-1 focus:ring-[#2B5CE6]" />
                   </div>
                   <div className="col-span-2">
                     <label className="block text-xs text-gray-500 mb-1">Role</label>
                     <select value={member.role ?? ''} onChange={e => updateMember(i, 'role', e.target.value)}
-                      className="w-full border border-gray-300 rounded px-2 h-8 text-sm focus:outline-none focus:ring-1 focus:ring-[#C8102E] bg-white">
+                      className="w-full border border-gray-300 rounded px-2 h-8 text-sm focus:outline-none focus:ring-1 focus:ring-[#2B5CE6] bg-white">
                       <option value="">Select…</option>
                       {MEMBER_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
@@ -329,18 +368,18 @@ export default function FamilyForm({ family }: Props) {
                     <label className="block text-xs text-gray-500 mb-1">Email</label>
                     <input type="email" value={member.email ?? ''} onChange={e => updateMember(i, 'email', e.target.value)}
                       placeholder="email@example.com"
-                      className="w-full border border-gray-300 rounded px-2 h-8 text-sm focus:outline-none focus:ring-1 focus:ring-[#C8102E]" />
+                      className="w-full border border-gray-300 rounded px-2 h-8 text-sm focus:outline-none focus:ring-1 focus:ring-[#2B5CE6]" />
                   </div>
                   <div className="col-span-2">
                     <label className="block text-xs text-gray-500 mb-1">Phone</label>
                     <input value={member.phoneNumber ?? ''} onChange={e => updateMember(i, 'phoneNumber', e.target.value)}
-                      className="w-full border border-gray-300 rounded px-2 h-8 text-sm focus:outline-none focus:ring-1 focus:ring-[#C8102E]" />
+                      className="w-full border border-gray-300 rounded px-2 h-8 text-sm focus:outline-none focus:ring-1 focus:ring-[#2B5CE6]" />
                   </div>
                   <div className="col-span-1 flex flex-col items-center pt-5">
                     <label className="block text-xs text-gray-500 mb-1">HOH</label>
                     <input type="checkbox" checked={!!member.isHeadOfHousehold}
                       onChange={e => updateMember(i, 'isHeadOfHousehold', e.target.checked)}
-                      className="w-4 h-4 accent-[#C8102E]" />
+                      className="w-4 h-4 accent-[#2B5CE6]" />
                   </div>
                   <div className="col-span-1 flex items-end justify-center pb-1">
                     <button type="button" onClick={() => removeMember(i)}
@@ -380,7 +419,7 @@ export default function FamilyForm({ family }: Props) {
               </button>
             )}
             <button type="submit" disabled={saving}
-              className="bg-[#C8102E] text-white text-sm font-semibold px-6 py-2 rounded-lg hover:bg-[#9B0020] transition-colors disabled:opacity-60">
+              className="bg-[#2B5CE6] text-white text-sm font-semibold px-6 py-2 rounded-lg hover:bg-[#1E47C8] transition-colors disabled:opacity-60">
               {saving ? 'Saving…' : isNew ? 'Create Family' : 'Save Changes'}
             </button>
           </div>

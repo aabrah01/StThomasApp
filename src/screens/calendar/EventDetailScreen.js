@@ -78,7 +78,7 @@ const EventDetailScreen = ({ route, navigation }) => {
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <View style={styles.iconWrap}>
-              <Ionicons name="time-outline" size={20} color={theme.colors.primary} />
+              <Ionicons name="time-outline" size={20} color={theme.colors.sapphire} />
             </View>
             <View style={styles.infoText}>
               <Text style={styles.infoLabel}>Time</Text>
@@ -94,7 +94,7 @@ const EventDetailScreen = ({ route, navigation }) => {
 
           <View style={styles.infoRow}>
             <View style={styles.iconWrap}>
-              <Ionicons name="hourglass-outline" size={20} color={theme.colors.primary} />
+              <Ionicons name="hourglass-outline" size={20} color={theme.colors.sapphire} />
             </View>
             <View style={styles.infoText}>
               <Text style={styles.infoLabel}>Duration</Text>
@@ -107,7 +107,7 @@ const EventDetailScreen = ({ route, navigation }) => {
               <View style={styles.separator} />
               <View style={styles.infoRow}>
                 <View style={styles.iconWrap}>
-                  <Ionicons name="location-outline" size={20} color={theme.colors.primary} />
+                  <Ionicons name="location-outline" size={20} color={theme.colors.sapphire} />
                 </View>
                 <View style={styles.infoText}>
                   <Text style={styles.infoLabel}>Location</Text>
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
 
   /* ── Header (mirrors FamilyDetailScreen pattern) ── */
   header: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.sapphire,
     flexDirection: 'row',
     alignItems: 'center',
     paddingTop: 56,

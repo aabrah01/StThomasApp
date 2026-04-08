@@ -24,7 +24,7 @@ const ContactInfo = ({ family }) => {
 
       <TouchableOpacity style={styles.infoRow} onPress={handleAddress} activeOpacity={0.7}>
         <View style={styles.iconWrap}>
-          <Ionicons name="location-outline" size={20} color={theme.colors.primary} />
+          <Ionicons name="location-outline" size={20} color={theme.colors.sapphire} />
         </View>
         <View style={styles.infoText}>
           <Text style={styles.infoLabel}>Address</Text>

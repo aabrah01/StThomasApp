@@ -12,7 +12,7 @@ interface User {
   isHoh: boolean;
 }
 
-export default function UsersClient({ users: initial, eligibleMembers }: { users: User[]; eligibleMembers: { email: string; name: string }[] }) {
+export default function UsersClient({ users: initial, eligibleMembers }: { users: User[]; eligibleMembers: { email: string; name: string; membershipId: string | null }[] }) {
   const [users, setUsers] = useState(initial);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
@@ -116,23 +116,25 @@ export default function UsersClient({ users: initial, eligibleMembers }: { users
           <div className="flex-1">
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Member</label>
             <select value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} required
-              className="w-full border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]">
+              className="w-full border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]">
               <option value="">Select a member…</option>
               {eligibleMembers.map(m => (
-                <option key={m.email} value={m.email}>{m.name} — {m.email}</option>
+                <option key={m.email} value={m.email}>
+                  {m.name}{m.membershipId ? ` [${m.membershipId}]` : ''} — {m.email}
+                </option>
               ))}
             </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Role</label>
             <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]">
+              className="border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]">
               <option value="member">Member</option>
               <option value="admin">Admin</option>
             </select>
           </div>
           <button type="submit" disabled={inviting}
-            className="bg-[#C8102E] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#9B0020] transition-colors disabled:opacity-50 h-[38px]">
+            className="bg-[#2B5CE6] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#1E47C8] transition-colors disabled:opacity-50 h-[38px]">
             {inviting ? 'Sending…' : 'Send Invite'}
           </button>
         </form>
@@ -149,17 +151,19 @@ export default function UsersClient({ users: initial, eligibleMembers }: { users
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Member *</label>
             <select value={createEmail} onChange={e => setCreateEmail(e.target.value)} required
-              className="w-full border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]">
+              className="w-full border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]">
               <option value="">Select a member…</option>
               {eligibleMembers.map(m => (
-                <option key={m.email} value={m.email}>{m.name} — {m.email}</option>
+                <option key={m.email} value={m.email}>
+                  {m.name}{m.membershipId ? ` [${m.membershipId}]` : ''} — {m.email}
+                </option>
               ))}
             </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Role *</label>
             <select value={createRole} onChange={e => setCreateRole(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]">
+              className="w-full border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]">
               <option value="member">Member</option>
               <option value="admin">Admin</option>
             </select>
@@ -169,7 +173,7 @@ export default function UsersClient({ users: initial, eligibleMembers }: { users
             <div className="relative">
               <input type={showPassword ? 'text' : 'password'} value={createPassword} onChange={e => setCreatePassword(e.target.value)} required minLength={8}
                 placeholder="Min. 8 characters"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] pr-16" />
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6] pr-16" />
               <button type="button" onClick={() => setShowPassword(p => !p)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600">
                 {showPassword ? 'Hide' : 'Show'}
@@ -180,14 +184,14 @@ export default function UsersClient({ users: initial, eligibleMembers }: { users
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Confirm Password *</label>
             <input type={showPassword ? 'text' : 'password'} value={createConfirm} onChange={e => setCreateConfirm(e.target.value)} required
               placeholder="Re-enter password"
-              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] ${createConfirm && createConfirm !== createPassword ? 'border-red-400' : 'border-gray-300'}`} />
+              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6] ${createConfirm && createConfirm !== createPassword ? 'border-red-400' : 'border-gray-300'}`} />
             {createConfirm && createConfirm !== createPassword && (
               <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
             )}
           </div>
           <div className="md:col-span-2 flex justify-end">
             <button type="submit" disabled={creating}
-              className="bg-[#C8102E] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#9B0020] transition-colors disabled:opacity-50 h-[38px]">
+              className="bg-[#2B5CE6] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#1E47C8] transition-colors disabled:opacity-50 h-[38px]">
               {creating ? 'Creating…' : 'Create User'}
             </button>
           </div>
@@ -219,7 +223,7 @@ export default function UsersClient({ users: initial, eligibleMembers }: { users
                   </td>
                   <td className="px-4 py-3">
                     <select value={u.role} onChange={e => handleRoleChange(u.id, e.target.value)}
-                      className="border border-gray-200 rounded px-2 h-[30px] text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#C8102E]">
+                      className="border border-gray-200 rounded px-2 h-[30px] text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#2B5CE6]">
                       <option value="member">Member</option>
                       <option value="admin">Admin</option>
                     </select>
@@ -227,7 +231,7 @@ export default function UsersClient({ users: initial, eligibleMembers }: { users
                   <td className="px-4 py-3">
                     {u.memberId ? (
                       <button onClick={() => handleHohToggle(u)}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${u.isHoh ? 'bg-[#C8102E]' : 'bg-gray-200'}`}>
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${u.isHoh ? 'bg-[#2B5CE6]' : 'bg-gray-200'}`}>
                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${u.isHoh ? 'translate-x-4' : 'translate-x-1'}`} />
                       </button>
                     ) : (
@@ -240,7 +244,7 @@ export default function UsersClient({ users: initial, eligibleMembers }: { users
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-3">
                       <button onClick={() => handleResetPassword(u)}
-                        className="text-[#1A4FC4] hover:underline text-sm font-medium">
+                        className="text-[#2B5CE6] hover:underline text-sm font-medium">
                         Reset Password
                       </button>
                       <button onClick={() => handleDelete(u)} className="text-red-400 hover:text-red-600 text-sm">Remove</button>

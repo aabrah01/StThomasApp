@@ -28,9 +28,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className="w-56 bg-[#C8102E] flex flex-col shrink-0 shadow-lg">
+      <aside className="w-56 bg-[#2B5CE6] flex flex-col shrink-0 shadow-lg">
         <div className="px-5 py-5 border-b border-white/10 flex flex-col items-center gap-3">
-          <Image src="/logo.png" alt="St. Thomas logo" width={56} height={55} style={{ height: 'auto' }} className="rounded-xl" />
+          <Image src="/logo.png" alt="St. Thomas logo" width={56} height={56} className="rounded-xl" />
           <div className="text-center">
             <div className="text-white font-bold text-xs leading-snug">St. Thomas Malankara Orthodox Church</div>
             <div className="text-white/60 text-xs mt-0.5">Admin Console</div>
@@ -48,7 +48,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 href={item.href}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors border-l-2 ${
                   active
-                    ? 'bg-white/15 text-[#C9A227] border-[#C9A227]'
+                    ? 'bg-white/15 text-white border-[#C9A84C]'
                     : 'text-white/70 hover:bg-white/10 hover:text-white border-transparent'
                 }`}
               >
