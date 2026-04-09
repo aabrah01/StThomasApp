@@ -32,8 +32,6 @@ yarn-error.*
 .env.local
 .env*
 
-# Supabase config (contains credentials via env vars — keep local only)
-supabase.config.js
 
 # IDE
 .vscode/
