@@ -307,7 +307,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     fontSize: theme.fonts.sizes.sm,
     fontWeight: '600',
-    textTransform: 'capitalize',
   },
   email: {
     fontSize: theme.fonts.sizes.sm,
