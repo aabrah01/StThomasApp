@@ -10,7 +10,7 @@ interface Props {
 }
 
 const BUCKET = 'family-photos';
-const MEMBER_ROLES = ['Husband', 'Wife', 'Son', 'Daughter', 'Son-In-Law', 'Daughter-In-Law', 'Grandparent', 'Grandchild', 'Other'];
+const MEMBER_ROLES = ['HoH', 'Son', 'Daughter', 'Son-In-Law', 'Daughter-In-Law', 'Grandparent', 'Grandchild', 'Other'];
 
 
 export default function FamilyForm({ family }: Props) {
