@@ -95,7 +95,6 @@ const styles = StyleSheet.create({
   memberRole: {
     fontSize: theme.fonts.sizes.sm,
     color: theme.colors.sapphire,
-    textTransform: 'capitalize',
     fontWeight: '600',
   },
   contactRow: {
