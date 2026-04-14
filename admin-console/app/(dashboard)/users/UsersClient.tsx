@@ -99,7 +99,7 @@ interface User {
   isHoh: boolean;
 }
 
-export default function UsersClient({ users: initial, eligibleMembers }: { users: User[]; eligibleMembers: { email: string; name: string; membershipId: string | null }[] }) {
+export default function UsersClient({ users: initial, eligibleMembers }: { users: User[]; eligibleMembers: Member[] }) {
   const [users, setUsers] = useState(initial);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
