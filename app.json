@@ -36,12 +36,15 @@
       "expo-font"
     ],
     "extra": {
-      "privacyPolicyUrl": "https://st-thomasli-app.vercel.app/privacy"
-    },
-    "extra": {
       "eas": {
         "projectId": "ffe90471-805e-46d4-ae5d-a5a4ddeacb0e"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ffe90471-805e-46d4-ae5d-a5a4ddeacb0e"
     }
   }
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useWindowDimensions, Platform } from 'react-native';
+import { useWindowDimensions, Platform, StatusBar } from 'react-native';
 import {
   View,
   Text,
