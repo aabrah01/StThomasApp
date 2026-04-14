@@ -2,15 +2,17 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 
-type Member = { email: string; name: string; membershipId: string | null };
+type Member = { id: string; email: string; name: string; membershipId: string | null };
 
 function MemberCombobox({
   value,
   onChange,
+  onSelect,
   members,
 }: {
   value: string;
   onChange: (email: string) => void;
+  onSelect?: (member: Member) => void;
   members: Member[];
 }) {
   const [query, setQuery] = useState('');
@@ -48,6 +50,7 @@ function MemberCombobox({
   const handleSelect = (m: Member) => {
     setSelectedMember(m);
     onChange(m.email);
+    onSelect?.(m);
     setQuery('');
     setOpen(false);
   };
@@ -103,6 +106,7 @@ export default function UsersClient({ users: initial, eligibleMembers }: { users
   const [inviting, setInviting] = useState(false);
   const [inviteMsg, setInviteMsg] = useState('');
   const [resetMsg, setResetMsg] = useState<{ id: string; msg: string; ok: boolean } | null>(null);
+  const [selectedInviteMember, setSelectedInviteMember] = useState<Member | null>(null);
 
   const [createEmail, setCreateEmail] = useState('');
   const [createPassword, setCreatePassword] = useState('');
@@ -110,6 +114,7 @@ export default function UsersClient({ users: initial, eligibleMembers }: { users
   const [createRole, setCreateRole] = useState('member');
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState('');
+  const [selectedCreateMember, setSelectedCreateMember] = useState<Member | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleResetPassword = async (user: User) => {
@@ -162,8 +167,17 @@ export default function UsersClient({ users: initial, eligibleMembers }: { users
     });
     const json = await res.json();
     if (res.ok) {
-      setUsers(prev => [...prev, { id: json.id, email: json.email, role: json.role, lastSignIn: null, memberId: null, memberName: null, isHoh: false }]);
+      setUsers(prev => [...prev, {
+        id: json.id,
+        email: json.email,
+        role: json.role,
+        lastSignIn: null,
+        memberId: selectedCreateMember?.id ?? null,
+        memberName: selectedCreateMember?.name ?? null,
+        isHoh: json.isHoh ?? false,
+      }]);
       setCreateEmail(''); setCreatePassword(''); setCreateConfirm('');
+      setSelectedCreateMember(null);
       setCreateMsg(`User ${json.email} created successfully.`);
     } else {
       setCreateMsg(json.error);
@@ -199,7 +213,7 @@ export default function UsersClient({ users: initial, eligibleMembers }: { users
         <form onSubmit={handleInvite} className="flex gap-3 items-end">
           <div className="flex-1">
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Member</label>
-            <MemberCombobox value={inviteEmail} onChange={setInviteEmail} members={eligibleMembers} />
+            <MemberCombobox value={inviteEmail} onChange={setInviteEmail} onSelect={setSelectedInviteMember} members={eligibleMembers} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Role</label>
@@ -226,7 +240,7 @@ export default function UsersClient({ users: initial, eligibleMembers }: { users
         <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Member *</label>
-            <MemberCombobox value={createEmail} onChange={setCreateEmail} members={eligibleMembers} />
+            <MemberCombobox value={createEmail} onChange={setCreateEmail} onSelect={setSelectedCreateMember} members={eligibleMembers} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Role *</label>

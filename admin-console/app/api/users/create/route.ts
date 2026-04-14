@@ -29,10 +29,12 @@ export async function POST(request: Request) {
   const supabase = createAdminSupabase();
 
   // Only allow creating accounts for emails that exist in the members table
-  const { count } = await supabase
+  const { data: memberRecord, count } = await supabase
     .from('members')
-    .select('id', { count: 'exact', head: true })
-    .eq('email', email);
+    .select('id, is_head_of_household', { count: 'exact' })
+    .eq('email', email)
+    .limit(1)
+    .single();
   if (!count || count === 0) {
     return NextResponse.json({ error: 'This email does not belong to a registered member.' }, { status: 400 });
   }
@@ -65,5 +67,5 @@ export async function POST(request: Request) {
     details: { email, role },
   });
 
-  return NextResponse.json({ id: user!.id, email: user!.email, role: role || 'member' });
+  return NextResponse.json({ id: user!.id, email: user!.email, role: role || 'member', isHoh: memberRecord?.is_head_of_household ?? false });
 }
