@@ -15,7 +15,6 @@ import { useAuth } from '../../context/AuthContext';
 import databaseService from '../../services/databaseService';
 import storageService from '../../services/storageService';
 import Avatar from '../../components/common/Avatar';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
 import theme from '../../styles/theme';
 import commonStyles from '../../styles/commonStyles';
 import * as Application from 'expo-application';
@@ -98,21 +97,9 @@ const ProfileScreen = ({ navigation }) => {
 
   const handleViewFamily = () => {
     if (family) {
-      navigation.navigate('Directory', {
-        screen: 'DirectoryList',
-      });
-      setTimeout(() => {
-        navigation.navigate('Directory', {
-          screen: 'FamilyDetail',
-          params: { familyId: family.id },
-        });
-      }, 100);
+      navigation.navigate('FamilyDetail', { familyId: family.id });
     }
   };
-
-  if (loading) {
-    return <LoadingSpinner />;
-  }
 
   return (
     <ScrollView style={commonStyles.container} showsVerticalScrollIndicator={false}>

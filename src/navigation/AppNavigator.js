@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import * as SplashScreen from 'expo-splash-screen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import LoadingSpinner from '../components/common/LoadingSpinner';
 
 import LoginScreen from '../screens/auth/LoginScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
@@ -42,6 +43,9 @@ const HEADER_TITLE_STYLE = {
 
 // All three tabs share this Tab Navigator — no nested stacks, so headers are identical
 const MainTabs = () => {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = 56 + insets.bottom;
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -51,9 +55,9 @@ const MainTabs = () => {
           backgroundColor: theme.colors.surface,
           borderTopWidth: 1,
           borderTopColor: theme.colors.border,
-          paddingBottom: 24,
+          paddingBottom: insets.bottom || 8,
           paddingTop: 8,
-          height: 80,
+          height: tabBarHeight,
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -63,6 +67,7 @@ const MainTabs = () => {
         headerStyle: HEADER_STYLE,
         headerTintColor: theme.colors.text,
         headerTitleStyle: HEADER_TITLE_STYLE,
+        headerTitleAlign: 'center',
       }}
     >
       <Tab.Screen
@@ -120,8 +125,14 @@ const AuthStack = () => {
 const AppNavigator = () => {
   const { user, loading } = useAuth();
 
+  useEffect(() => {
+    if (!loading) {
+      SplashScreen.hideAsync();
+    }
+  }, [loading]);
+
   if (loading) {
-    return <LoadingSpinner />;
+    return null;
   }
 
   return (

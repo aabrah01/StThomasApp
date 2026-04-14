@@ -13,7 +13,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import databaseService from '../../services/databaseService';
 import FamilyCard from '../../components/directory/FamilyCard';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import theme from '../../styles/theme';
 import commonStyles from '../../styles/commonStyles';
@@ -79,10 +78,6 @@ const DirectoryListScreen = ({ navigation }) => {
     loadFamilies();
   };
 
-  if (loading) {
-    return <LoadingSpinner />;
-  }
-
   return (
     <View style={commonStyles.container}>
       <View style={styles.searchContainer}>
@@ -102,6 +97,14 @@ const DirectoryListScreen = ({ navigation }) => {
       </View>
 
       <ErrorMessage message={error} style={styles.error} />
+
+      {families.length > 0 && (
+        <Text style={styles.countLabel}>
+          {searchQuery.trim()
+            ? `${filteredFamilies.length} of ${families.length} families`
+            : `${families.length} families`}
+        </Text>
+      )}
 
       {filteredFamilies.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -172,6 +175,15 @@ const styles = StyleSheet.create({
     marginBottom: CARD_MARGIN,
   },
   error: {
+    marginHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
+  countLabel: {
+    fontSize: theme.fonts.sizes.xs,
+    color: theme.colors.textSecondary,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
     marginHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.sm,
   },

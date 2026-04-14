@@ -12,7 +12,6 @@ import { Calendar } from 'react-native-calendars';
 import calendarService from '../../services/calendarService';
 import databaseService from '../../services/databaseService';
 import EventCard from '../../components/calendar/EventCard';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import theme from '../../styles/theme';
 import commonStyles from '../../styles/commonStyles';
@@ -140,10 +139,6 @@ const CalendarScreen = ({ navigation }) => {
   const getEventsForSelectedDate = () => {
     return calendarService.getEventsByDate(events, selectedDate);
   };
-
-  if (loading) {
-    return <LoadingSpinner />;
-  }
 
   const selectedEvents = getEventsForSelectedDate();
   // Append T00:00:00 so the string is parsed as local time, not UTC midnight

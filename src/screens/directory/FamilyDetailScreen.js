@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { useWindowDimensions, Platform } from 'react-native';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import databaseService from '../../services/databaseService';
 import storageService from '../../services/storageService';
@@ -24,6 +25,8 @@ import commonStyles from '../../styles/commonStyles';
 
 const FamilyDetailScreen = ({ route, navigation }) => {
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const topInset = Platform.OS === 'android' ? (StatusBar.currentHeight ?? insets.top) : insets.top;
   const isTablet = width >= 768;
   const photoAspectRatio = width >= 1024 ? 2.5 : isTablet ? 1.8 : 1.2;
   const { familyId } = route.params;
@@ -124,7 +127,11 @@ const FamilyDetailScreen = ({ route, navigation }) => {
     .toUpperCase();
 
   return (
-    <ScrollView style={commonStyles.container} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={commonStyles.container} edges={Platform.OS === 'android' ? ['bottom'] : []}>
+    <ScrollView
+      style={commonStyles.container}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Photo area wrapper — back button lives here as a sibling, NOT inside the photo TouchableOpacity */}
       <View style={[styles.photoWrapper, { aspectRatio: photoAspectRatio }]}>
         <View style={styles.photoArea}>
@@ -148,7 +155,7 @@ const FamilyDetailScreen = ({ route, navigation }) => {
 
         {/* Back button is OUTSIDE the photo TouchableOpacity so taps never bubble to photo picker */}
         <TouchableOpacity
-          style={styles.backButton}
+          style={[styles.backButton, { top: topInset + 8 }]}
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
@@ -157,7 +164,7 @@ const FamilyDetailScreen = ({ route, navigation }) => {
 
         {(isAdmin() || currentMember?.isHeadOfHousehold && currentMember?.familyId === familyId) && (
           <TouchableOpacity
-            style={styles.editPhotoButton}
+            style={[styles.editPhotoButton, { top: topInset + 8 }]}
             onPress={handleEditPhoto}
             disabled={uploadingPhoto}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -227,6 +234,7 @@ const FamilyDetailScreen = ({ route, navigation }) => {
 
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -267,7 +275,6 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 52,
     left: theme.spacing.md,
     width: 48,
     height: 48,
@@ -279,7 +286,6 @@ const styles = StyleSheet.create({
   },
   editPhotoButton: {
     position: 'absolute',
-    top: 52,
     right: theme.spacing.md,
     width: 48,
     height: 48,
