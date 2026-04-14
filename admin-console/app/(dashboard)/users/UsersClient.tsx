@@ -1,6 +1,90 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+
+type Member = { email: string; name: string; membershipId: string | null };
+
+function MemberCombobox({
+  value,
+  onChange,
+  members,
+}: {
+  value: string;
+  onChange: (email: string) => void;
+  members: Member[];
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // When the parent clears the value (e.g. after submit), reset internal selection
+  useEffect(() => {
+    if (!value) setSelectedMember(null);
+  }, [value]);
+
+  const displayValue = selectedMember
+    ? `${selectedMember.name} — ${selectedMember.email}`
+    : '';
+
+  const filtered = query
+    ? members.filter(m =>
+        m.name.toLowerCase().includes(query.toLowerCase()) ||
+        m.email.toLowerCase().includes(query.toLowerCase())
+      )
+    : members;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleSelect = (m: Member) => {
+    setSelectedMember(m);
+    onChange(m.email);
+    setQuery('');
+    setOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        type="text"
+        value={open ? query : displayValue}
+        onChange={e => { setQuery(e.target.value); setOpen(true); if (!e.target.value) { onChange(''); setSelectedMember(null); } }}
+        onFocus={() => { setOpen(true); setQuery(''); }}
+        placeholder="Search by name or email…"
+        autoComplete="off"
+        className="w-full border border-gray-300 rounded-lg px-3 h-[38px] text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]"
+      />
+      {/* hidden input keeps native form required validation working */}
+      <input type="text" value={value} required readOnly tabIndex={-1} className="sr-only" aria-hidden />
+      {open && (
+        <ul className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto text-sm">
+          {filtered.length === 0 ? (
+            <li className="px-3 py-2 text-gray-400">No members found</li>
+          ) : filtered.map((m, i) => (
+            <li
+              key={`${m.name}-${m.email}-${i}`}
+              onMouseDown={() => handleSelect(m)}
+              className="px-3 py-2 cursor-pointer hover:bg-blue-50"
+            >
+              <span className="font-medium text-gray-900">{m.name}</span>
+              {m.membershipId && <span className="text-gray-400 ml-1">[{m.membershipId}]</span>}
+              <span className="text-gray-500 ml-2">— {m.email}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 interface User {
   id: string;
@@ -115,15 +199,7 @@ export default function UsersClient({ users: initial, eligibleMembers }: { users
         <form onSubmit={handleInvite} className="flex gap-3 items-end">
           <div className="flex-1">
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Member</label>
-            <select value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} required
-              className="w-full border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]">
-              <option value="">Select a member…</option>
-              {eligibleMembers.map(m => (
-                <option key={m.email} value={m.email}>
-                  {m.name}{m.membershipId ? ` [${m.membershipId}]` : ''} — {m.email}
-                </option>
-              ))}
-            </select>
+            <MemberCombobox value={inviteEmail} onChange={setInviteEmail} members={eligibleMembers} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Role</label>
@@ -150,15 +226,7 @@ export default function UsersClient({ users: initial, eligibleMembers }: { users
         <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Member *</label>
-            <select value={createEmail} onChange={e => setCreateEmail(e.target.value)} required
-              className="w-full border border-gray-300 rounded-lg px-3 h-[38px] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2B5CE6]">
-              <option value="">Select a member…</option>
-              {eligibleMembers.map(m => (
-                <option key={m.email} value={m.email}>
-                  {m.name}{m.membershipId ? ` [${m.membershipId}]` : ''} — {m.email}
-                </option>
-              ))}
-            </select>
+            <MemberCombobox value={createEmail} onChange={setCreateEmail} members={eligibleMembers} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Role *</label>

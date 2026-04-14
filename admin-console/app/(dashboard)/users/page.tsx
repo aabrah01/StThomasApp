@@ -41,16 +41,11 @@ export default async function UsersPage() {
     });
 
     // Members with an email who don't already have an auth account.
-    // Deduplicate by email — multiple members may share one login.
     const existingEmails = new Set(rows.map(r => r.email.toLowerCase()));
-    const seenEmails = new Set<string>();
     eligibleMembers = (members ?? [])
       .filter(m => {
         if (!m.email) return false;
-        const key = m.email.toLowerCase();
-        if (existingEmails.has(key) || seenEmails.has(key)) return false;
-        seenEmails.add(key);
-        return true;
+        return !existingEmails.has(m.email.toLowerCase());
       })
       .map(m => ({
           email: m.email!,
