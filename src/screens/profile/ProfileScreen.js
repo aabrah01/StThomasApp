@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -8,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -15,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import databaseService from '../../services/databaseService';
 import storageService from '../../services/storageService';
 import Avatar from '../../components/common/Avatar';
+import CropModal from '../../components/common/CropModal';
 import theme from '../../styles/theme';
 import commonStyles from '../../styles/commonStyles';
 import * as Application from 'expo-application';
@@ -25,12 +28,16 @@ const ProfileScreen = ({ navigation }) => {
   const [contributions, setContributions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [cropModalVisible, setCropModalVisible] = useState(false);
+  const [pendingImageUri, setPendingImageUri] = useState(null);
 
   const currentYear = new Date().getFullYear();
 
-  useEffect(() => {
-    loadFamilyData();
-  }, [member]);
+  useFocusEffect(
+    useCallback(() => {
+      loadFamilyData();
+    }, [member])
+  );
 
   const loadFamilyData = async () => {
     const promises = [];
@@ -47,10 +54,24 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const handleUploadFamilyPhoto = () => {
-    Alert.alert('Family Photo', 'Update your family photo', [
+    const options = [
       { text: 'Choose from Library', onPress: pickFamilyPhoto },
+      ...(family?.photoUrl ? [{ text: 'Remove Photo', style: 'destructive', onPress: removeFamilyPhoto }] : []),
       { text: 'Cancel', style: 'cancel' },
-    ]);
+    ];
+    Alert.alert('Family Photo', 'Update your family photo', options);
+  };
+
+  const removeFamilyPhoto = async () => {
+    setUploadingPhoto(true);
+    const { error: dbError } = await databaseService.updateFamilyPhoto(member.familyId, null);
+    if (dbError) {
+      Alert.alert('Remove failed', dbError);
+    } else {
+      await storageService.deleteFamilyPhoto(family.photoUrl);
+      setFamily(prev => ({ ...prev, photoUrl: null }));
+    }
+    setUploadingPhoto(false);
   };
 
   const pickFamilyPhoto = async () => {
@@ -60,22 +81,38 @@ const ProfileScreen = ({ navigation }) => {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
+      mediaTypes: 'images',
+      allowsEditing: Platform.OS !== 'android',
       aspect: [1, 1],
       quality: 0.8,
+      ...(Platform.OS === 'android' && { legacy: true }),
     });
-    if (!result.canceled && result.assets[0]) {
-      setUploadingPhoto(true);
-      const { url, error: uploadError } = await storageService.uploadFamilyPhoto(member.familyId, result.assets[0].uri);
-      if (uploadError) {
-        Alert.alert('Upload failed', uploadError);
+    if (result.assets?.[0]) {
+      if (Platform.OS === 'android') {
+        setPendingImageUri(result.assets[0].uri);
+        setCropModalVisible(true);
       } else {
-        await databaseService.updateFamilyPhoto(member.familyId, url);
+        uploadFamilyPhoto(result.assets[0].uri);
+      }
+    }
+  };
+
+  const uploadFamilyPhoto = async (uri) => {
+    setUploadingPhoto(true);
+    const previousUrl = family?.photoUrl;
+    const { url, error: uploadError } = await storageService.uploadFamilyPhoto(member.familyId, uri);
+    if (uploadError) {
+      Alert.alert('Upload failed', uploadError);
+    } else {
+      const { error: dbError } = await databaseService.updateFamilyPhoto(member.familyId, url);
+      if (dbError) {
+        Alert.alert('Update failed', dbError);
+      } else {
+        await storageService.deleteFamilyPhoto(previousUrl);
         setFamily(prev => ({ ...prev, photoUrl: url }));
       }
-      setUploadingPhoto(false);
     }
+    setUploadingPhoto(false);
   };
 
   const handleLogout = () => {
@@ -102,6 +139,7 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   return (
+    <>
     <ScrollView style={commonStyles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View style={styles.avatarWrapper}>
@@ -258,6 +296,16 @@ const ProfileScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
     </ScrollView>
+    <CropModal
+      visible={cropModalVisible}
+      imageUri={pendingImageUri}
+      onCrop={(uri) => {
+        setCropModalVisible(false);
+        uploadFamilyPhoto(uri);
+      }}
+      onCancel={() => setCropModalVisible(false)}
+    />
+    </>
   );
 };
 

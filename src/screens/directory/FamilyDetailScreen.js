@@ -20,6 +20,7 @@ import ContactInfo from '../../components/directory/ContactInfo';
 import MemberList from '../../components/directory/MemberList';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorMessage from '../../components/common/ErrorMessage';
+import CropModal from '../../components/common/CropModal';
 import theme from '../../styles/theme';
 import commonStyles from '../../styles/commonStyles';
 
@@ -36,6 +37,8 @@ const FamilyDetailScreen = ({ route, navigation }) => {
   const [contributions, setContributions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [cropModalVisible, setCropModalVisible] = useState(false);
+  const [pendingImageUri, setPendingImageUri] = useState(null);
   const [error, setError] = useState('');
 
   const currentYear = new Date().getFullYear();
@@ -77,10 +80,24 @@ const FamilyDetailScreen = ({ route, navigation }) => {
   };
 
   const handleEditPhoto = () => {
-    Alert.alert('Family Photo', 'Update this family\'s photo', [
+    const options = [
       { text: 'Choose from Library', onPress: pickPhoto },
+      ...(family.photoUrl ? [{ text: 'Remove Photo', style: 'destructive', onPress: removePhoto }] : []),
       { text: 'Cancel', style: 'cancel' },
-    ]);
+    ];
+    Alert.alert('Family Photo', 'Update this family\'s photo', options);
+  };
+
+  const removePhoto = async () => {
+    setUploadingPhoto(true);
+    const { error: dbError } = await databaseService.updateFamilyPhoto(familyId, null);
+    if (dbError) {
+      Alert.alert('Remove failed', dbError);
+    } else {
+      await storageService.deleteFamilyPhoto(family.photoUrl);
+      setFamily(prev => ({ ...prev, photoUrl: null }));
+    }
+    setUploadingPhoto(false);
   };
 
   const pickPhoto = async () => {
@@ -90,22 +107,38 @@ const FamilyDetailScreen = ({ route, navigation }) => {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
+      mediaTypes: 'images',
+      allowsEditing: Platform.OS !== 'android',
       aspect: [1, 1],
       quality: 0.8,
+      ...(Platform.OS === 'android' && { legacy: true }),
     });
-    if (!result.canceled && result.assets[0]) {
-      setUploadingPhoto(true);
-      const { url, error: uploadError } = await storageService.uploadFamilyPhoto(familyId, result.assets[0].uri);
-      if (uploadError) {
-        Alert.alert('Upload failed', uploadError);
+    if (result.assets?.[0]) {
+      if (Platform.OS === 'android') {
+        setPendingImageUri(result.assets[0].uri);
+        setCropModalVisible(true);
       } else {
-        await databaseService.updateFamilyPhoto(familyId, url);
+        uploadPhoto(result.assets[0].uri);
+      }
+    }
+  };
+
+  const uploadPhoto = async (uri) => {
+    setUploadingPhoto(true);
+    const previousUrl = family.photoUrl;
+    const { url, error: uploadError } = await storageService.uploadFamilyPhoto(familyId, uri);
+    if (uploadError) {
+      Alert.alert('Upload failed', uploadError);
+    } else {
+      const { error: dbError } = await databaseService.updateFamilyPhoto(familyId, url);
+      if (dbError) {
+        Alert.alert('Update failed', dbError);
+      } else {
+        await storageService.deleteFamilyPhoto(previousUrl);
         setFamily(prev => ({ ...prev, photoUrl: url }));
       }
-      setUploadingPhoto(false);
     }
+    setUploadingPhoto(false);
   };
 
   if (loading) return <LoadingSpinner />;
@@ -127,6 +160,7 @@ const FamilyDetailScreen = ({ route, navigation }) => {
     .toUpperCase();
 
   return (
+    <>
     <SafeAreaView style={commonStyles.container} edges={Platform.OS === 'android' ? ['bottom'] : []}>
     <ScrollView
       style={commonStyles.container}
@@ -235,6 +269,16 @@ const FamilyDetailScreen = ({ route, navigation }) => {
       </View>
     </ScrollView>
     </SafeAreaView>
+    <CropModal
+      visible={cropModalVisible}
+      imageUri={pendingImageUri}
+      onCrop={(uri) => {
+        setCropModalVisible(false);
+        uploadPhoto(uri);
+      }}
+      onCancel={() => setCropModalVisible(false)}
+    />
+    </>
   );
 };
 

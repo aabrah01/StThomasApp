@@ -53,10 +53,13 @@ export async function POST(request: Request) {
   }
 
   if (user) {
-    await supabase.from('user_roles').upsert(
-      { user_id: user.id, role: role || 'member' },
-      { onConflict: 'user_id' }
-    );
+    await Promise.all([
+      supabase.from('user_roles').upsert(
+        { user_id: user.id, role: role || 'member' },
+        { onConflict: 'user_id' }
+      ),
+      supabase.from('members').update({ user_id: user.id }).eq('email', email),
+    ]);
   }
 
   await supabase.from('audit_log').insert({

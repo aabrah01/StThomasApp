@@ -39,10 +39,13 @@ export async function POST(request: Request) {
   if (error) return NextResponse.json({ error: 'Failed to send invitation' }, { status: 400 });
 
   if (user) {
-    await supabase.from('user_roles').upsert(
-      { user_id: user.id, role: role || 'member' },
-      { onConflict: 'user_id' }
-    );
+    await Promise.all([
+      supabase.from('user_roles').upsert(
+        { user_id: user.id, role: role || 'member' },
+        { onConflict: 'user_id' }
+      ),
+      supabase.from('members').update({ user_id: user.id }).eq('email', email),
+    ]);
   }
 
   await supabase.from('audit_log').insert({

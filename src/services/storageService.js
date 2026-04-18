@@ -22,12 +22,12 @@ class StorageService {
 
     try {
       const response = await fetch(localUri);
-      const blob = await response.blob();
+      const arrayBuffer = await response.arrayBuffer();
       const path = `families/${familyId}/family-${Date.now()}.jpg`;
 
       const { error: uploadError } = await supabase.storage
         .from(BUCKET)
-        .upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
+        .upload(path, arrayBuffer, { upsert: true, contentType: 'image/jpeg' });
 
       if (uploadError) return { url: null, error: uploadError.message };
 
@@ -36,6 +36,19 @@ class StorageService {
       return { url: data.publicUrl, error: null };
     } catch {
       return { url: null, error: 'Upload failed. Please try again.' };
+    }
+  }
+
+  async deleteFamilyPhoto(url) {
+    if (DEMO_MODE || !url) return;
+    try {
+      const marker = `/${BUCKET}/`;
+      const idx = url.indexOf(marker);
+      if (idx === -1) return;
+      const path = url.slice(idx + marker.length);
+      await supabase.storage.from(BUCKET).remove([path]);
+    } catch {
+      // best-effort cleanup
     }
   }
 }
