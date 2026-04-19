@@ -14,7 +14,7 @@ import YoutubePlayer from 'react-native-youtube-iframe';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../styles/theme';
 
-const VideoPlayerModal = ({ visible, video, onClose }) => {
+const VideoPlayerModal = ({ visible, video, churchName, onClose }) => {
   const { width } = useWindowDimensions();
 
   const onStateChange = useCallback(() => {}, []);
@@ -58,7 +58,7 @@ const VideoPlayerModal = ({ visible, video, onClose }) => {
           <View style={styles.infoSection}>
             <View style={styles.labelRow}>
               <Ionicons name="videocam" size={13} color={theme.colors.sapphire} />
-              <Text style={styles.label}>St. Thomas Church</Text>
+              {churchName ? <Text style={styles.label}>{churchName}</Text> : null}
             </View>
             <Text style={styles.title}>{video.title}</Text>
           </View>

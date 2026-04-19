@@ -39,6 +39,7 @@ const CalendarScreen = ({ navigation }) => {
   const [videosMap, setVideosMap] = useState({});
   const [modalVideo, setModalVideo] = useState(null);
   const [videoModalVisible, setVideoModalVisible] = useState(false);
+  const [churchName, setChurchName] = useState('');
 
   useEffect(() => {
     initializeCalendar();
@@ -50,6 +51,8 @@ const CalendarScreen = ({ navigation }) => {
 
   const initializeCalendar = async () => {
     const { data: settings } = await databaseService.getAppSettings();
+
+    if (settings?.churchName) setChurchName(settings.churchName);
 
     if (settings?.googleCalendarId && settings?.googleApiKey) {
       calendarService.setConfig(settings.googleCalendarId, settings.googleApiKey);
@@ -269,6 +272,7 @@ const CalendarScreen = ({ navigation }) => {
       <VideoPlayerModal
         visible={videoModalVisible}
         video={modalVideo}
+        churchName={churchName}
         onClose={() => {
           setVideoModalVisible(false);
           setModalVideo(null);
