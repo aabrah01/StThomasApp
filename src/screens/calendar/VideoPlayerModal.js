@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,16 +16,10 @@ import theme from '../../styles/theme';
 
 const VideoPlayerModal = ({ visible, video, onClose }) => {
   const { width } = useWindowDimensions();
-  const [playing, setPlaying] = useState(false);
 
-  const onStateChange = useCallback((state) => {
-    if (state === 'ended') {
-      setPlaying(false);
-    }
-  }, []);
+  const onStateChange = useCallback(() => {}, []);
 
   const handleClose = () => {
-    setPlaying(false);
     onClose();
   };
 
@@ -47,7 +41,7 @@ const VideoPlayerModal = ({ visible, video, onClose }) => {
           <TouchableOpacity onPress={handleClose} style={styles.closeButton} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Ionicons name="chevron-down" size={24} color="#FFFFFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>Sunday Homily</Text>
+          <Text style={styles.headerTitle} numberOfLines={1}>{video.title}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -56,7 +50,6 @@ const VideoPlayerModal = ({ visible, video, onClose }) => {
             <YoutubePlayer
               height={playerHeight}
               videoId={video.videoId}
-              play={playing}
               onChangeState={onStateChange}
               initialPlayerParams={{ modestbranding: true, rel: 0 }}
             />
@@ -68,20 +61,6 @@ const VideoPlayerModal = ({ visible, video, onClose }) => {
               <Text style={styles.label}>St. Thomas Church</Text>
             </View>
             <Text style={styles.title}>{video.title}</Text>
-            <TouchableOpacity
-              style={styles.playButton}
-              onPress={() => setPlaying(p => !p)}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name={playing ? 'pause-circle' : 'play-circle'}
-                size={22}
-                color="#FFFFFF"
-              />
-              <Text style={styles.playButtonText}>
-                {playing ? 'Pause' : 'Play Homily'}
-              </Text>
-            </TouchableOpacity>
           </View>
         </ScrollView>
       </View>
@@ -144,20 +123,6 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     lineHeight: 28,
     marginBottom: theme.spacing.lg,
-  },
-  playButton: {
-    backgroundColor: theme.colors.sapphire,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    gap: theme.spacing.sm,
-  },
-  playButtonText: {
-    color: '#FFFFFF',
-    fontSize: theme.fonts.sizes.md,
-    fontWeight: '700',
   },
 });
 
