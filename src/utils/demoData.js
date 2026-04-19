@@ -486,3 +486,22 @@ export const demoAppSettings = {
   churchAddress: '100 Church Street, Springfield, IL 62701',
   contactEmail: 'info@stthomas.org',
 };
+
+// Keyed by YYYY-MM-DD — each entry is a public YouTube video for that Sunday's homily
+export const demoYoutubeVideos = {
+  '2026-04-19': {
+    videoId: 'dQw4w9WgXcQ',
+    title: 'Easter Sunday Homily – April 19, 2026',
+    thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+  },
+  '2026-04-12': {
+    videoId: 'dQw4w9WgXcQ',
+    title: 'Palm Sunday Homily – April 12, 2026',
+    thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+  },
+  '2026-04-05': {
+    videoId: 'dQw4w9WgXcQ',
+    title: '5th Sunday of Lent Homily – April 5, 2026',
+    thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+  },
+};

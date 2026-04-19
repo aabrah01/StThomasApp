@@ -19,6 +19,8 @@ export const MEMBER_ROLES = {
 export const STORAGE_KEYS = {
   CALENDAR_EVENTS: '@st_thomas_calendar_events',
   LAST_SYNC: '@st_thomas_last_sync',
+  YOUTUBE_VIDEOS: '@st_thomas_youtube_videos',
+  YOUTUBE_LAST_SYNC: '@st_thomas_youtube_last_sync',
 };
 
 export const ERROR_MESSAGES = {
