@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   StatusBar,
-  Platform,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../styles/theme';
@@ -35,8 +35,8 @@ const VideoPlayerModal = ({ visible, video, churchName, onClose }) => {
       presentationStyle="pageSheet"
       onRequestClose={handleClose}
     >
-      <StatusBar barStyle="light-content" />
-      <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={theme.colors.sapphire} />
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleClose} style={styles.closeButton} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Ionicons name="chevron-down" size={24} color="#FFFFFF" />
@@ -67,7 +67,7 @@ const VideoPlayerModal = ({ visible, video, churchName, onClose }) => {
             <Text style={styles.title}>{video.title}</Text>
           </View>
         </ScrollView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 };
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: theme.spacing.md,
     paddingBottom: theme.spacing.md,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + theme.spacing.md : theme.spacing.md,
+    paddingTop: theme.spacing.md,
   },
   closeButton: {
     padding: 4,
