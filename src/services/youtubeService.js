@@ -184,8 +184,6 @@ class YoutubeService {
         if (date) {
           if (!map[date]) map[date] = [];
           map[date].push(video);
-        } else {
-          console.log('[YouTube] no date parsed from:', video.title);
         }
       }
 

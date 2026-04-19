@@ -64,7 +64,6 @@ const CalendarScreen = ({ navigation }) => {
     }
 
     const ytKey = settings?.youtubeApiKey || settings?.googleApiKey;
-    console.log('[Calendar] ytKey present:', !!ytKey, 'settings keys:', Object.keys(settings || {}));
     if (ytKey) {
       youtubeService.setApiKey(ytKey);
       loadYoutubeVideos();
@@ -95,9 +94,7 @@ const CalendarScreen = ({ navigation }) => {
   const loadYoutubeVideos = async (year = new Date().getFullYear()) => {
     if (loadedYearsRef.current.has(year)) return;
     loadedYearsRef.current.add(year);
-    console.log('[Calendar] loading YouTube videos for year:', year);
     const map = await youtubeService.getVideosMap(year);
-    console.log('[Calendar] YouTube map size:', Object.keys(map).length);
     if (Object.keys(map).length > 0) {
       setVideosMap(prev => ({ ...prev, ...map }));
     }
