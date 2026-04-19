@@ -97,8 +97,9 @@ class YoutubeService {
       const data = response.data;
 
       for (const item of data.items || []) {
-        // Only include public videos
-        if (item.status?.privacyStatus !== 'public') continue;
+        // Skip explicitly private or unlisted videos; include if status is absent
+        const privacy = item.status?.privacyStatus;
+        if (privacy && privacy !== 'public') continue;
 
         const snippet = item.snippet;
         const videoId = snippet.resourceId?.videoId;
