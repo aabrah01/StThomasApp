@@ -18,7 +18,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.stthomas.directory",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": ["zelle"]
       }
     },
     "android": {

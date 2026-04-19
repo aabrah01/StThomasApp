@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Image,
   Platform,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -21,6 +22,7 @@ import CropModal from '../../components/common/CropModal';
 import theme from '../../styles/theme';
 import commonStyles from '../../styles/commonStyles';
 import * as Application from 'expo-application';
+import * as Clipboard from 'expo-clipboard';
 
 const ProfileScreen = ({ navigation }) => {
   const { user, member, userRole, signOut, isAdmin } = useAuth();
@@ -138,6 +140,18 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
+  const handleZelle = async () => {
+    try {
+      await Linking.openURL('zelle://');
+    } catch {
+      Alert.alert(
+        'Donate via Zelle',
+        "Open your banking app's Zelle feature and send to:\n\ndonate@stthomasli.org",
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
   return (
     <>
     <ScrollView style={commonStyles.container} showsVerticalScrollIndicator={false}>
@@ -226,6 +240,27 @@ const ProfileScreen = ({ navigation }) => {
             )}
           </View>
         )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Donate</Text>
+          <TouchableOpacity
+            style={[styles.row, styles.lastRow]}
+            onPress={handleZelle}
+            onLongPress={() => {
+              Clipboard.setStringAsync('donate@stthomasli.org');
+              Alert.alert('Copied', 'Zelle email copied to clipboard.');
+            }}
+          >
+            <View style={styles.iconBox}>
+              <Text style={styles.rowIcon}>💙</Text>
+            </View>
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Give via Zelle</Text>
+              <Text style={styles.rowValue}>donate@stthomasli.org</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.colors.textLight} />
+          </TouchableOpacity>
+        </View>
 
         {member?.isHeadOfHousehold && contributions.length > 0 && (() => {
           const ytdTotal = contributions.reduce((sum, c) => sum + c.amount, 0);

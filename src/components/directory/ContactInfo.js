@@ -46,7 +46,7 @@ const ContactInfo = ({ family }) => {
 const styles = StyleSheet.create({
   container: {},
   sectionTitle: {
-    fontSize: theme.fonts.sizes.md,
+    fontSize: theme.fonts.sizes.lg,
     fontWeight: '700',
     color: theme.colors.accent,
     marginBottom: theme.spacing.md,
@@ -55,9 +55,6 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
   },
   iconWrap: {
     width: 36,
