@@ -169,6 +169,9 @@ const CalendarScreen = ({ navigation }) => {
   const handleRefresh = () => {
     setRefreshing(true);
     loadEvents();
+    loadedYearsRef.current.clear();
+    setVideosMap({});
+    loadYoutubeVideos();
   };
 
   const getEventsForSelectedDate = () => {
