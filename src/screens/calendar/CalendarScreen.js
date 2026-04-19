@@ -10,8 +10,11 @@ import {
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import calendarService from '../../services/calendarService';
+import youtubeService from '../../services/youtubeService';
 import databaseService from '../../services/databaseService';
 import EventCard from '../../components/calendar/EventCard';
+import HomiliesCard from '../../components/calendar/HomiliesCard';
+import VideoPlayerModal from './VideoPlayerModal';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import theme from '../../styles/theme';
 import commonStyles from '../../styles/commonStyles';
@@ -22,6 +25,7 @@ const CalendarScreen = ({ navigation }) => {
   const [events, setEvents] = useState([]);
   const [monthLoading, setMonthLoading] = useState(false);
   const loadedRangeRef = useRef({ min: null, max: null });
+  const loadedYearsRef = useRef(new Set());
   const [selectedDate, setSelectedDate] = useState(() => {
     // Use local date parts to avoid UTC midnight shifting the date
     const d = new Date();
@@ -33,19 +37,23 @@ const CalendarScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [videosMap, setVideosMap] = useState({});
+  const [modalVideo, setModalVideo] = useState(null);
+  const [videoModalVisible, setVideoModalVisible] = useState(false);
+  const [churchName, setChurchName] = useState('');
 
   useEffect(() => {
     initializeCalendar();
   }, []);
 
   useEffect(() => {
-    if (events.length > 0) {
-      markEventDates();
-    }
-  }, [events, selectedDate]);
+    markEventDates();
+  }, [events, videosMap, selectedDate]);
 
   const initializeCalendar = async () => {
     const { data: settings } = await databaseService.getAppSettings();
+
+    if (settings?.churchName) setChurchName(settings.churchName);
 
     if (settings?.googleCalendarId && settings?.googleApiKey) {
       calendarService.setConfig(settings.googleCalendarId, settings.googleApiKey);
@@ -53,6 +61,12 @@ const CalendarScreen = ({ navigation }) => {
     } else {
       setError('Calendar not configured. Please contact administrator.');
       setLoading(false);
+    }
+
+    const ytKey = settings?.youtubeApiKey || settings?.googleApiKey;
+    if (ytKey) {
+      youtubeService.setApiKey(ytKey);
+      loadYoutubeVideos();
     }
   };
 
@@ -77,7 +91,18 @@ const CalendarScreen = ({ navigation }) => {
     setRefreshing(false);
   };
 
+  const loadYoutubeVideos = async (year = new Date().getFullYear()) => {
+    if (loadedYearsRef.current.has(year)) return;
+    loadedYearsRef.current.add(year);
+    const map = await youtubeService.getVideosMap(year);
+    if (Object.keys(map).length > 0) {
+      setVideosMap(prev => ({ ...prev, ...map }));
+    }
+  };
+
   const handleMonthChange = async (month) => {
+    loadYoutubeVideos(month.year);
+
     const { min, max } = loadedRangeRef.current;
     if (!min || !max) return;
 
@@ -112,10 +137,20 @@ const CalendarScreen = ({ navigation }) => {
     events.forEach((event) => {
       // Split directly on 'T' — avoids UTC conversion shifting the date
       const date = event.startDate.split('T')[0];
-      marked[date] = {
-        marked: true,
-        dotColor: theme.colors.sapphire,
-      };
+      if (!marked[date]) {
+        marked[date] = { dots: [{ key: 'event', color: theme.colors.sapphire }] };
+      }
+    });
+
+    Object.keys(videosMap).forEach((date) => {
+      const existing = marked[date]?.dots || [];
+      const alreadyHasVideo = existing.some(d => d.key === 'video');
+      if (!alreadyHasVideo) {
+        marked[date] = {
+          ...marked[date],
+          dots: [...existing, { key: 'video', color: theme.colors.accent }],
+        };
+      }
     });
 
     marked[selectedDate] = {
@@ -141,6 +176,8 @@ const CalendarScreen = ({ navigation }) => {
   };
 
   const selectedEvents = getEventsForSelectedDate();
+  const selectedVideos = videosMap[selectedDate] || [];
+  const totalCount = selectedEvents.length + selectedVideos.length;
   // Append T00:00:00 so the string is parsed as local time, not UTC midnight
   const formattedDate = new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-US', {
     weekday: 'long',
@@ -156,6 +193,7 @@ const CalendarScreen = ({ navigation }) => {
         onDayPress={handleDayPress}
         onMonthChange={handleMonthChange}
         markedDates={markedDates}
+        markingType="multi-dot"
         theme={{
           backgroundColor: theme.colors.surface,
           calendarBackground: theme.colors.surface,
@@ -187,14 +225,14 @@ const CalendarScreen = ({ navigation }) => {
       <View style={styles.eventsSection}>
         <View style={styles.eventsHeader}>
           <Text style={styles.eventsTitle}>{formattedDate}</Text>
-          {selectedEvents.length > 0 && (
+          {totalCount > 0 && (
             <View style={styles.countBadge}>
-              <Text style={styles.countText}>{selectedEvents.length}</Text>
+              <Text style={styles.countText}>{totalCount}</Text>
             </View>
           )}
         </View>
 
-        {selectedEvents.length === 0 ? (
+        {totalCount === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📭</Text>
             <Text style={styles.emptyText}>No events on this day</Text>
@@ -203,6 +241,22 @@ const CalendarScreen = ({ navigation }) => {
           <FlatList
             data={selectedEvents}
             keyExtractor={(item) => item.id}
+            ListHeaderComponent={
+              selectedVideos.length > 0 ? (
+                <>
+                  {selectedVideos.map((video) => (
+                    <HomiliesCard
+                      key={video.videoId}
+                      video={video}
+                      onPress={() => {
+                        setModalVideo(video);
+                        setVideoModalVisible(true);
+                      }}
+                    />
+                  ))}
+                </>
+              ) : null
+            }
             renderItem={({ item }) => (
               <EventCard
                 event={item}
@@ -221,6 +275,16 @@ const CalendarScreen = ({ navigation }) => {
         )}
       </View>
       </View>
+
+      <VideoPlayerModal
+        visible={videoModalVisible}
+        video={modalVideo}
+        churchName={churchName}
+        onClose={() => {
+          setVideoModalVisible(false);
+          setModalVideo(null);
+        }}
+      />
     </View>
   );
 };
