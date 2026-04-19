@@ -166,8 +166,8 @@ const CalendarScreen = ({ navigation }) => {
   };
 
   const selectedEvents = getEventsForSelectedDate();
-  const selectedVideo = videosMap[selectedDate] || null;
-  const totalCount = selectedEvents.length + (selectedVideo ? 1 : 0);
+  const selectedVideos = videosMap[selectedDate] || [];
+  const totalCount = selectedEvents.length + selectedVideos.length;
   // Append T00:00:00 so the string is parsed as local time, not UTC midnight
   const formattedDate = new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-US', {
     weekday: 'long',
@@ -232,14 +232,19 @@ const CalendarScreen = ({ navigation }) => {
             data={selectedEvents}
             keyExtractor={(item) => item.id}
             ListHeaderComponent={
-              selectedVideo ? (
-                <HomiliesCard
-                  video={selectedVideo}
-                  onPress={() => {
-                    setModalVideo(selectedVideo);
-                    setVideoModalVisible(true);
-                  }}
-                />
+              selectedVideos.length > 0 ? (
+                <>
+                  {selectedVideos.map((video) => (
+                    <HomiliesCard
+                      key={video.videoId}
+                      video={video}
+                      onPress={() => {
+                        setModalVideo(video);
+                        setVideoModalVisible(true);
+                      }}
+                    />
+                  ))}
+                </>
               ) : null
             }
             renderItem={({ item }) => (

@@ -172,7 +172,8 @@ class YoutubeService {
         const date = this.parseDateFromTitle(video.title);
         console.log('[YouTube] title:', video.title, '→ date:', date);
         if (date) {
-          map[date] = video;
+          if (!map[date]) map[date] = [];
+          map[date].push(video);
         }
       }
 
