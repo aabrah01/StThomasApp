@@ -103,6 +103,7 @@ export async function POST(request: Request) {
     const familyName = deriveFamilyName(familyRows);
 
     let dbFamilyId: string;
+    let preserved = new Map<string, { user_id: string | null; is_hoh: boolean }>();
 
     if (existingMap.has(familyId)) {
       // Update existing family
@@ -120,6 +121,18 @@ export async function POST(request: Request) {
         .eq('id', dbFamilyId);
 
       if (famErr) { errors.push(`Family ${familyId}: ${famErr.message}`); continue; }
+
+      // Snapshot user_id and is_head_of_household before wiping members so they
+      // survive the delete+reinsert cycle (email is the stable linking key).
+      const { data: existingMembers } = await supabase
+        .from('members')
+        .select('email, user_id, is_head_of_household')
+        .eq('family_id', dbFamilyId);
+      for (const m of existingMembers ?? []) {
+        if (m.email && (m.user_id || m.is_head_of_household)) {
+          preserved.set(m.email.toLowerCase(), { user_id: m.user_id, is_hoh: m.is_head_of_household });
+        }
+      }
 
       // Remove existing members before re-inserting
       await supabase.from('members').delete().eq('family_id', dbFamilyId);
@@ -164,6 +177,17 @@ export async function POST(request: Request) {
       errors.push(`Members for family ${familyId}: ${memErr.message}`);
     } else {
       summary.newMembers += memberInserts.length;
+
+      // Restore user_id and is_head_of_household for members whose email matched an existing record
+      if (preserved.size > 0) {
+        for (const [email, { user_id, is_hoh }] of preserved) {
+          await supabase
+            .from('members')
+            .update({ user_id, is_head_of_household: is_hoh })
+            .eq('family_id', dbFamilyId)
+            .ilike('email', email);
+        }
+      }
     }
   }
 
