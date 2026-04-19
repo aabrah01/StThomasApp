@@ -52,6 +52,10 @@ const VideoPlayerModal = ({ visible, video, churchName, onClose }) => {
               videoId={video.videoId}
               onChangeState={onStateChange}
               initialPlayerParams={{ modestbranding: true, rel: 0 }}
+              webViewProps={{
+                allowsInlineMediaPlayback: true,
+                mediaPlaybackRequiresUserAction: false,
+              }}
             />
           </View>
 
