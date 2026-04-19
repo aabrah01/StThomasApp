@@ -25,6 +25,7 @@ const CalendarScreen = ({ navigation }) => {
   const [events, setEvents] = useState([]);
   const [monthLoading, setMonthLoading] = useState(false);
   const loadedRangeRef = useRef({ min: null, max: null });
+  const loadedYearsRef = useRef(new Set());
   const [selectedDate, setSelectedDate] = useState(() => {
     // Use local date parts to avoid UTC midnight shifting the date
     const d = new Date();
@@ -90,12 +91,18 @@ const CalendarScreen = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  const loadYoutubeVideos = async () => {
-    const map = await youtubeService.getVideosMap();
-    setVideosMap(map);
+  const loadYoutubeVideos = async (year = new Date().getFullYear()) => {
+    if (loadedYearsRef.current.has(year)) return;
+    loadedYearsRef.current.add(year);
+    const map = await youtubeService.getVideosMap(year);
+    if (Object.keys(map).length > 0) {
+      setVideosMap(prev => ({ ...prev, ...map }));
+    }
   };
 
   const handleMonthChange = async (month) => {
+    loadYoutubeVideos(month.year);
+
     const { min, max } = loadedRangeRef.current;
     if (!min || !max) return;
 

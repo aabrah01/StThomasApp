@@ -22,6 +22,8 @@ class YoutubeService {
     this.channelHandle = 'StThomasLI';
     this.baseUrl = 'https://www.googleapis.com/youtube/v3';
     this._channelId = null;
+    // Cache playlist IDs per year to avoid redundant playlist list calls
+    this._playlistIdByYear = {};
   }
 
   setApiKey(key) {
@@ -46,8 +48,10 @@ class YoutubeService {
     return this._channelId;
   }
 
-  async findCurrentYearPlaylist(channelId) {
-    const year = String(new Date().getFullYear());
+  async findPlaylistForYear(channelId, year) {
+    if (this._playlistIdByYear[year]) return this._playlistIdByYear[year];
+
+    const yearStr = String(year);
     let nextPageToken = null;
 
     do {
@@ -63,9 +67,12 @@ class YoutubeService {
       const data = response.data;
 
       const match = (data.items || []).find(p =>
-        p.snippet.title.includes(year)
+        p.snippet.title.includes(yearStr)
       );
-      if (match) return match.id;
+      if (match) {
+        this._playlistIdByYear[year] = match.id;
+        return match.id;
+      }
 
       nextPageToken = data.nextPageToken || null;
     } while (nextPageToken);
@@ -145,7 +152,7 @@ class YoutubeService {
     return null;
   }
 
-  async getVideosMap() {
+  async getVideosMap(year = new Date().getFullYear()) {
     if (DEMO_MODE) {
       return demoYoutubeVideos;
     }
@@ -153,33 +160,27 @@ class YoutubeService {
     if (!this.apiKey) return {};
 
     // Return cached map if fresh
-    const cached = await this._getCachedVideosMap();
+    const cached = await this._getCachedVideosMap(year);
     if (cached) return cached;
 
     try {
       const channelId = await this.resolveChannelId();
-      console.log('[YouTube] channelId:', channelId);
-
-      const playlistId = await this.findCurrentYearPlaylist(channelId);
-      console.log('[YouTube] playlistId:', playlistId);
+      const playlistId = await this.findPlaylistForYear(channelId, year);
       if (!playlistId) return {};
 
       const videos = await this.fetchPlaylistVideos(playlistId);
-      console.log('[YouTube] videos fetched:', videos.length);
 
       const map = {};
       for (const video of videos) {
         const date = this.parseDateFromTitle(video.title);
-        console.log('[YouTube] title:', video.title, '→ date:', date);
         if (date) {
           if (!map[date]) map[date] = [];
           map[date].push(video);
         }
       }
 
-      console.log('[YouTube] mapped dates:', Object.keys(map));
       if (Object.keys(map).length > 0) {
-        await this._cacheVideosMap(map);
+        await this._cacheVideosMap(map, year);
       }
       return map;
     } catch (error) {
@@ -187,24 +188,30 @@ class YoutubeService {
       const reason = error?.response?.data?.error?.errors?.[0]?.reason;
       const message = error?.response?.data?.error?.message;
       console.warn('YouTube API error', status, reason, message);
-      // Try stale cache on error
-      const stale = await this._getStaleCache();
+      const stale = await this._getStaleCacheForYear(year);
       return stale || {};
     }
   }
 
-  async _getCachedVideosMap() {
+  _cacheKey(year) {
+    return `${STORAGE_KEYS.YOUTUBE_VIDEOS}_${year}`;
+  }
+
+  _syncKey(year) {
+    return `${STORAGE_KEYS.YOUTUBE_LAST_SYNC}_${year}`;
+  }
+
+  async _getCachedVideosMap(year) {
     try {
-      const lastSync = await AsyncStorage.getItem(STORAGE_KEYS.YOUTUBE_LAST_SYNC);
+      const lastSync = await AsyncStorage.getItem(this._syncKey(year));
       if (!lastSync) return null;
 
       const age = Date.now() - new Date(lastSync).getTime();
       if (age > CACHE_TTL_MS) return null;
 
-      const raw = await AsyncStorage.getItem(STORAGE_KEYS.YOUTUBE_VIDEOS);
+      const raw = await AsyncStorage.getItem(this._cacheKey(year));
       if (!raw) return null;
       const map = JSON.parse(raw);
-      // Treat a cached empty map as stale so we always retry after a failed fetch
       if (Object.keys(map).length === 0) return null;
       return map;
     } catch {
@@ -212,19 +219,19 @@ class YoutubeService {
     }
   }
 
-  async _getStaleCache() {
+  async _getStaleCacheForYear(year) {
     try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEYS.YOUTUBE_VIDEOS);
+      const raw = await AsyncStorage.getItem(this._cacheKey(year));
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
     }
   }
 
-  async _cacheVideosMap(map) {
+  async _cacheVideosMap(map, year) {
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.YOUTUBE_VIDEOS, JSON.stringify(map));
-      await AsyncStorage.setItem(STORAGE_KEYS.YOUTUBE_LAST_SYNC, new Date().toISOString());
+      await AsyncStorage.setItem(this._cacheKey(year), JSON.stringify(map));
+      await AsyncStorage.setItem(this._syncKey(year), new Date().toISOString());
     } catch (error) {
       console.error('Error caching YouTube videos:', error);
     }
