@@ -59,8 +59,9 @@ const CalendarScreen = ({ navigation }) => {
       setLoading(false);
     }
 
-    if (settings?.youtubeApiKey) {
-      youtubeService.setApiKey(settings.youtubeApiKey);
+    const ytKey = settings?.youtubeApiKey || settings?.googleApiKey;
+    if (ytKey) {
+      youtubeService.setApiKey(ytKey);
       loadYoutubeVideos();
     }
   };
