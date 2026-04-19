@@ -18,11 +18,7 @@ const HomiliesCard = ({ video, onPress }) => {
       </View>
       <View style={styles.divider} />
       <View style={styles.content}>
-        <View style={styles.labelRow}>
-          <Ionicons name="videocam" size={12} color={theme.colors.sapphire} />
-          <Text style={styles.label}>Sunday Homily</Text>
-        </View>
-        <Text style={styles.title} numberOfLines={2}>{video.title}</Text>
+        <Text style={styles.title} numberOfLines={3}>{video.title}</Text>
       </View>
       <Ionicons name="chevron-forward" size={16} color={theme.colors.textLight} style={styles.chevron} />
     </TouchableOpacity>
@@ -62,19 +58,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: theme.spacing.md,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  label: {
-    fontSize: theme.fonts.sizes.xs,
-    fontWeight: '600',
-    color: theme.colors.sapphire,
-    marginLeft: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   title: {
     fontSize: theme.fonts.sizes.md,
