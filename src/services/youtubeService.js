@@ -118,30 +118,31 @@ class YoutubeService {
   }
 
   parseDateFromTitle(title) {
-    // Match: optional weekday, month name (full/abbrev), day (with optional ordinal), year
+    // Pattern 1: (MM-DD-YY) or (MM-DD-YYYY)
+    const shortDate = title.match(/\((\d{1,2})-(\d{1,2})-(\d{2,4})\)/);
+    if (shortDate) {
+      const [, mm, dd, yy] = shortDate;
+      const year = yy.length === 2 ? 2000 + parseInt(yy, 10) : parseInt(yy, 10);
+      return `${year}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+    }
+
+    // Pattern 2: Month name (full/abbrev), day (with optional ordinal), 4-digit year
     const allMonths = [...MONTH_NAMES, ...MONTH_ABBREVS].join('|');
-    const pattern = new RegExp(
-      `(${allMonths})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})`,
-      'i'
+    const longDate = title.match(
+      new RegExp(`(${allMonths})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})`, 'i')
     );
+    if (longDate) {
+      const [, monthStr, dayStr, yearStr] = longDate;
+      const lc = monthStr.toLowerCase().replace('.', '');
+      let monthIndex = MONTH_NAMES.indexOf(lc);
+      if (monthIndex === -1) monthIndex = MONTH_ABBREVS.indexOf(lc);
+      if (monthIndex === -1) return null;
+      const mm = String(monthIndex + 1).padStart(2, '0');
+      const dd = String(parseInt(dayStr, 10)).padStart(2, '0');
+      return `${yearStr}-${mm}-${dd}`;
+    }
 
-    const match = title.match(pattern);
-    if (!match) return null;
-
-    const [, monthStr, dayStr, yearStr] = match;
-    const lc = monthStr.toLowerCase().replace('.', '');
-
-    let monthIndex = MONTH_NAMES.indexOf(lc);
-    if (monthIndex === -1) monthIndex = MONTH_ABBREVS.indexOf(lc);
-    if (monthIndex === -1) return null;
-
-    const year = parseInt(yearStr, 10);
-    const month = monthIndex + 1;
-    const day = parseInt(dayStr, 10);
-
-    const mm = String(month).padStart(2, '0');
-    const dd = String(day).padStart(2, '0');
-    return `${year}-${mm}-${dd}`;
+    return null;
   }
 
   async getVideosMap() {
