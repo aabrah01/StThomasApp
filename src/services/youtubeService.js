@@ -125,8 +125,8 @@ class YoutubeService {
   }
 
   parseDateFromTitle(title) {
-    // Pattern 1: (MM-DD-YY) or (MM-DD-YYYY)
-    const shortDate = title.match(/\((\d{1,2})-(\d{1,2})-(\d{2,4})\)/);
+    // Pattern 1: (MM-DD-YY), (MM-DD-YYYY), (MM/DD/YY), (MM/DD/YYYY)
+    const shortDate = title.match(/\((\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})\)/);
     if (shortDate) {
       const [, mm, dd, yy] = shortDate;
       const year = yy.length === 2 ? 2000 + parseInt(yy, 10) : parseInt(yy, 10);
