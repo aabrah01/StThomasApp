@@ -173,7 +173,12 @@ class YoutubeService {
       await this._cacheVideosMap(map);
       return map;
     } catch (error) {
-      console.error('Error fetching YouTube videos:', error);
+      const status = error?.response?.status;
+      if (status === 403 || status === 400) {
+        console.warn('YouTube API key not authorized for YouTube Data API v3. Add a youtube_api_key to app_settings in Supabase.');
+      } else {
+        console.warn('Error fetching YouTube videos:', error.message);
+      }
       // Try stale cache on error
       const stale = await this._getStaleCache();
       return stale || {};

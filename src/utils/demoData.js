@@ -482,6 +482,7 @@ export const demoContributions = [
 export const demoAppSettings = {
   googleCalendarId: 'demo-calendar',
   googleApiKey: 'demo-api-key',
+  youtubeApiKey: 'demo-youtube-key',
   churchName: 'St. Thomas Church',
   churchAddress: '100 Church Street, Springfield, IL 62701',
   contactEmail: 'info@stthomas.org',

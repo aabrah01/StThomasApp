@@ -53,6 +53,7 @@ const mapMember = (row) => ({
 const mapAppSettings = (row) => ({
   googleCalendarId: row.google_calendar_id,
   googleApiKey: row.google_api_key,
+  youtubeApiKey: row.youtube_api_key,
   churchName: row.church_name,
   churchAddress: row.church_address,
   contactEmail: row.contact_email,
