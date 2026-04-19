@@ -125,12 +125,19 @@ class YoutubeService {
   }
 
   parseDateFromTitle(title) {
-    // Pattern 1: (MM-DD-YY), (MM-DD-YYYY), (MM/DD/YY), (MM/DD/YYYY)
-    const shortDate = title.match(/\((\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})\)/);
-    if (shortDate) {
-      const [, mm, dd, yy] = shortDate;
+    // Pattern 1a: (MM-DD-YY), (MM-DD-YYYY), (MM/DD/YY), (MM/DD/YYYY) — with parentheses
+    const parenDate = title.match(/\((\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})\)/);
+    if (parenDate) {
+      const [, mm, dd, yy] = parenDate;
       const year = yy.length === 2 ? 2000 + parseInt(yy, 10) : parseInt(yy, 10);
       return `${year}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+    }
+
+    // Pattern 1b: MM-DD-YYYY or MM/DD/YYYY — without parentheses, 4-digit year required
+    const bareDate = title.match(/\b(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})\b/);
+    if (bareDate) {
+      const [, mm, dd, yyyy] = bareDate;
+      return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
     }
 
     // Pattern 2: Month name (full/abbrev), day (with optional ordinal), 4-digit year
