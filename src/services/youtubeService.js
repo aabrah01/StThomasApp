@@ -157,28 +157,34 @@ class YoutubeService {
 
     try {
       const channelId = await this.resolveChannelId();
+      console.log('[YouTube] channelId:', channelId);
+
       const playlistId = await this.findCurrentYearPlaylist(channelId);
+      console.log('[YouTube] playlistId:', playlistId);
       if (!playlistId) return {};
 
       const videos = await this.fetchPlaylistVideos(playlistId);
+      console.log('[YouTube] videos fetched:', videos.length);
 
       const map = {};
       for (const video of videos) {
         const date = this.parseDateFromTitle(video.title);
+        console.log('[YouTube] title:', video.title, '→ date:', date);
         if (date) {
           map[date] = video;
         }
       }
 
-      await this._cacheVideosMap(map);
+      console.log('[YouTube] mapped dates:', Object.keys(map));
+      if (Object.keys(map).length > 0) {
+        await this._cacheVideosMap(map);
+      }
       return map;
     } catch (error) {
       const status = error?.response?.status;
-      if (status === 403 || status === 400) {
-        console.warn('YouTube API key not authorized for YouTube Data API v3. Add a youtube_api_key to app_settings in Supabase.');
-      } else {
-        console.warn('Error fetching YouTube videos:', error.message);
-      }
+      const reason = error?.response?.data?.error?.errors?.[0]?.reason;
+      const message = error?.response?.data?.error?.message;
+      console.warn('YouTube API error', status, reason, message);
       // Try stale cache on error
       const stale = await this._getStaleCache();
       return stale || {};
@@ -194,7 +200,11 @@ class YoutubeService {
       if (age > CACHE_TTL_MS) return null;
 
       const raw = await AsyncStorage.getItem(STORAGE_KEYS.YOUTUBE_VIDEOS);
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) return null;
+      const map = JSON.parse(raw);
+      // Treat a cached empty map as stale so we always retry after a failed fetch
+      if (Object.keys(map).length === 0) return null;
+      return map;
     } catch {
       return null;
     }
