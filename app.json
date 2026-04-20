@@ -24,8 +24,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/transparent_icon.png",
+        "backgroundColor": "#FDF9F3"
       },
       "package": "com.stthomas.directory"
     },
