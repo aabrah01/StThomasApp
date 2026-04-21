@@ -103,6 +103,8 @@ export async function POST(request: Request) {
     const familyName = deriveFamilyName(familyRows);
 
     let dbFamilyId: string;
+    // Keyed by lowercase email → { user_id, is_hoh } for members that have an
+    // auth link or HOH flag. Restored after delete+reinsert using new member IDs.
     let preserved = new Map<string, { user_id: string | null; is_hoh: boolean }>();
 
     if (existingMap.has(familyId)) {
@@ -122,21 +124,25 @@ export async function POST(request: Request) {
 
       if (famErr) { errors.push(`Family ${familyId}: ${famErr.message}`); continue; }
 
-      // Snapshot user_id and is_head_of_household before wiping members so they
-      // survive the delete+reinsert cycle (email is the stable linking key).
+      // Snapshot member_users links and is_head_of_household before wiping members.
+      // The ON DELETE CASCADE on member_users.member_id removes junction rows when
+      // members are deleted, so we re-insert them after using the new member IDs.
       const { data: existingMembers } = await supabase
         .from('members')
-        .select('email, user_id, is_head_of_household')
+        .select('email, is_head_of_household, member_users(user_id)')
         .eq('family_id', dbFamilyId);
+
       for (const m of existingMembers ?? []) {
-        if (m.email && (m.user_id || m.is_head_of_household)) {
-          preserved.set(m.email.toLowerCase(), { user_id: m.user_id, is_hoh: m.is_head_of_household });
+        if (!m.email) continue;
+        const linked = (m.member_users as { user_id: string }[] ?? []);
+        const user_id = linked[0]?.user_id ?? null;
+        if (user_id || m.is_head_of_household) {
+          preserved.set(m.email.toLowerCase(), { user_id, is_hoh: m.is_head_of_household });
         }
       }
 
       // Remove existing members before re-inserting
       await supabase.from('members').delete().eq('family_id', dbFamilyId);
-      summary.updatedFamilies++;
     } else {
       // Create new family
       const { data: newFam, error: famErr } = await supabase
@@ -178,14 +184,34 @@ export async function POST(request: Request) {
     } else {
       summary.newMembers += memberInserts.length;
 
-      // Restore user_id and is_head_of_household for members whose email matched an existing record
+      // Restore is_head_of_household and member_users links for members whose
+      // email matched a preserved record. Fetch newly inserted IDs first since
+      // the delete+reinsert cycle assigned new UUIDs.
       if (preserved.size > 0) {
-        for (const [email, { user_id, is_hoh }] of preserved) {
-          await supabase
-            .from('members')
-            .update({ user_id, is_head_of_household: is_hoh })
-            .eq('family_id', dbFamilyId)
-            .ilike('email', email);
+        const { data: newMembers } = await supabase
+          .from('members')
+          .select('id, email, is_head_of_household')
+          .eq('family_id', dbFamilyId);
+
+        for (const nm of newMembers ?? []) {
+          const email = nm.email?.toLowerCase();
+          if (!email) continue;
+          const snap = preserved.get(email);
+          if (!snap) continue;
+
+          if (snap.is_hoh && !nm.is_head_of_household) {
+            await supabase
+              .from('members')
+              .update({ is_head_of_household: true })
+              .eq('id', nm.id);
+          }
+
+          if (snap.user_id) {
+            const { error: linkErr } = await supabase
+              .from('member_users')
+              .upsert({ user_id: snap.user_id, member_id: nm.id }, { onConflict: 'user_id,member_id' });
+            if (linkErr) errors.push(`Restore user link for ${email}: ${linkErr.message}`);
+          }
         }
       }
     }

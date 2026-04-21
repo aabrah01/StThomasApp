@@ -39,12 +39,20 @@ export async function POST(request: Request) {
   if (error) return NextResponse.json({ error: 'Failed to send invitation' }, { status: 400 });
 
   if (user) {
+    const { data: matched } = await supabase
+      .from('members')
+      .select('id')
+      .eq('email', email);
+
     await Promise.all([
       supabase.from('user_roles').upsert(
         { user_id: user.id, role: role || 'member' },
         { onConflict: 'user_id' }
       ),
-      supabase.from('members').update({ user_id: user.id }).eq('email', email),
+      supabase.from('member_users').upsert(
+        (matched ?? []).map(m => ({ user_id: user.id, member_id: m.id })),
+        { onConflict: 'user_id,member_id' }
+      ),
     ]);
   }
 

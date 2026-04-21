@@ -34,6 +34,14 @@ create table members (
   created_at            timestamptz default now()
 );
 
+-- Auth user ↔ member junction (replaces members.user_id)
+create table member_users (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  member_id  uuid not null references members(id)    on delete cascade,
+  created_at timestamptz default now(),
+  primary key (user_id, member_id)
+);
+
 -- User roles
 create table user_roles (
   user_id         uuid primary key references auth.users(id) on delete cascade,
@@ -108,6 +116,7 @@ alter table qbwc_sessions enable row level security;
 -- ============================================================
 alter table families      enable row level security;
 alter table members       enable row level security;
+alter table member_users  enable row level security;
 alter table user_roles    enable row level security;
 alter table events        enable row level security;
 alter table contributions enable row level security;
@@ -119,7 +128,23 @@ create policy "auth_read_events"    on events    for select using (auth.role() =
 -- Users can read their own role (required for admin console auth check)
 create policy "users_read_own_role" on user_roles for select using (auth.uid() = user_id);
 
--- Members can link their own auth account on first login (email match, user_id not yet set)
+-- member_users: authenticated users can read their own links
+create policy "member_users_read_own" on member_users
+  for select using (user_id = auth.uid());
+
+-- member_users: self-link — user may link to a member whose email matches their auth email
+create policy "member_users_self_link" on member_users
+  for insert with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from members m
+      where m.id = member_id
+        and m.email = auth.email()
+    )
+  );
+
+-- Legacy self-link kept during rollout so old app builds can still link on first login.
+-- Drop this (along with members.user_id column) once the new app build is fully adopted.
 create policy "member_self_link" on members
   for update using (
     email = auth.email() and user_id is null
@@ -131,7 +156,13 @@ create policy "member_self_link" on members
 -- Members can only update their own family record (for photo uploads)
 create policy "member_update_own_family" on families
   for update using (
-    id = (select family_id from members where user_id = auth.uid() limit 1)
+    id = (
+      select m.family_id
+      from   members m
+      join   member_users mu on mu.member_id = m.id
+      where  mu.user_id = auth.uid()
+      limit 1
+    )
   );
 
 -- Admins can manage all families
@@ -141,13 +172,14 @@ create policy "admin_manage_families" on families
   );
 
 -- Contributions: only the head-of-household for that family can read.
--- Matches on user_id (fast, post-link) or email (fallback for accounts not yet linked).
 create policy "hoh_read_own_contributions" on contributions
   for select using (
     family_id = (
-      select family_id from members
-      where (user_id = auth.uid() or email = auth.email())
-        and is_head_of_household = true
+      select m.family_id
+      from   members m
+      join   member_users mu on mu.member_id = m.id
+      where  mu.user_id = auth.uid()
+        and  m.is_head_of_household = true
       limit 1
     )
   );

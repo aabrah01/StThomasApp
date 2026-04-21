@@ -38,7 +38,6 @@ const mapFamily = (row) => ({
 const mapMember = (row) => ({
   id: row.id,
   familyId: row.family_id,
-  userId: row.user_id,
   firstName: row.first_name,
   lastName: row.last_name,
   email: row.email,
@@ -175,15 +174,15 @@ class DatabaseService {
       return { data: member, error: null };
     }
 
-    // Multiple members may share the same email and thus the same user_id — return the first
     const { data, error } = await supabase
-      .from('members')
-      .select('*')
+      .from('member_users')
+      .select('members(*)')
       .eq('user_id', userId)
       .limit(1);
 
     if (error) return { data: null, error: error.message };
-    return { data: data?.[0] ? mapMember(data[0]) : null, error: null };
+    const row = data?.[0]?.members;
+    return { data: row ? mapMember(row) : null, error: null };
   }
 
   async getMemberByEmail(email) {
@@ -211,10 +210,8 @@ class DatabaseService {
 
   async linkMemberToUser(memberId, userId) {
     const { error } = await supabase
-      .from('members')
-      .update({ user_id: userId })
-      .eq('id', memberId)
-      .is('user_id', null); // safety: only update if still unlinked
+      .from('member_users')
+      .upsert({ user_id: userId, member_id: memberId }, { onConflict: 'user_id,member_id' });
 
     return { error: error?.message ?? null };
   }
