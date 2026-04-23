@@ -265,6 +265,22 @@ class DatabaseService {
     return { data: data.map(mapContribution), error: null };
   }
 
+  async getContributionSettings() {
+    if (DEMO_MODE) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return { asofDate: new Date().toISOString().slice(0, 10) };
+    }
+
+    const { data, error } = await supabase
+      .from('contribution_settings')
+      .select('asof_date')
+      .eq('id', 1)
+      .single();
+
+    if (error || !data) return null;
+    return { asofDate: data.asof_date };
+  }
+
   async getAppSettings() {
     if (DEMO_MODE) {
       await new Promise(resolve => setTimeout(resolve, 200));

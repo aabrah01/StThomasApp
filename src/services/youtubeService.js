@@ -244,6 +244,21 @@ class YoutubeService {
       console.error('Error caching YouTube videos:', error);
     }
   }
+
+  async clearCache() {
+    try {
+      const currentYear = new Date().getFullYear();
+      // Clear current and adjacent years to cover year-boundary edge cases
+      await Promise.all(
+        [currentYear - 1, currentYear, currentYear + 1].flatMap(year => [
+          AsyncStorage.removeItem(this._cacheKey(year)),
+          AsyncStorage.removeItem(this._syncKey(year)),
+        ])
+      );
+    } catch (error) {
+      console.error('Error clearing YouTube cache:', error);
+    }
+  }
 }
 
 export default new YoutubeService();

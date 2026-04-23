@@ -129,7 +129,7 @@ export default function ContributionsClient({ contributions: initial, families }
     const res = await fetch('/api/contributions/import', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows: csvRows }),
+      body: JSON.stringify({ rows: csvRows, asofDate: importDate }),
     });
     const json = await res.json();
     setImportResult(res.ok ? `Imported ${json.count} contributions.` : json.error);

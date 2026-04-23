@@ -33,7 +33,8 @@ const ProfileScreen = ({ navigation }) => {
   const [cropModalVisible, setCropModalVisible] = useState(false);
   const [pendingImageUri, setPendingImageUri] = useState(null);
 
-  const currentYear = new Date().getFullYear();
+  const [givingYear, setGivingYear] = useState(new Date().getFullYear());
+  const [asofLabel, setAsofLabel] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -42,11 +43,20 @@ const ProfileScreen = ({ navigation }) => {
   );
 
   const loadFamilyData = async () => {
+    const settingsResult = await databaseService.getContributionSettings();
+    const asofDate = settingsResult?.asofDate ?? new Date().toISOString().slice(0, 10);
+    const asofObj = new Date(asofDate + 'T00:00:00');
+    const year = asofObj.getFullYear();
+    const mm = String(asofObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(asofObj.getDate()).padStart(2, '0');
+    setGivingYear(year);
+    setAsofLabel(`${mm}-${dd}-${year}`);
+
     const promises = [];
     if (member?.familyId) {
       promises.push(
         databaseService.getFamilyById(member.familyId),
-        databaseService.getContributions(member.familyId, currentYear),
+        databaseService.getContributions(member.familyId, year),
       );
     }
     const [familyResult, contribResult] = await Promise.all(promises);
@@ -271,7 +281,7 @@ const ProfileScreen = ({ navigation }) => {
           }, {});
           return (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Giving · {currentYear} YTD</Text>
+              <Text style={styles.sectionTitle}>{givingYear} YTD Giving As Of {asofLabel}</Text>
 
               {/* Total rollup */}
               <View style={styles.row}>

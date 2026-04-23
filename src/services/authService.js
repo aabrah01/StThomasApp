@@ -55,7 +55,12 @@ class AuthService {
       };
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'TOKEN_REFRESH_FAILED') {
+        // Stale/invalid refresh token — Supabase already cleared storage; propagate sign-out
+        supabase.auth.signOut().finally(() => callback(null));
+        return;
+      }
       callback(session?.user || null);
     });
     return () => subscription.unsubscribe();

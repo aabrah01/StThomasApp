@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Request too large' }, { status: 413 });
   }
 
-  const { rows }: { rows: CsvRow[] } = await request.json();
+  const { rows, asofDate }: { rows: CsvRow[]; asofDate?: string } = await request.json();
 
   if (!Array.isArray(rows)) {
     return NextResponse.json({ error: 'rows must be an array' }, { status: 400 });
@@ -77,6 +77,12 @@ export async function POST(request: Request) {
 
   const { error } = await supabase.from('contributions').insert(toInsert);
   if (error) return NextResponse.json({ error: 'Import failed' }, { status: 400 });
+
+  if (asofDate && /^\d{4}-\d{2}-\d{2}$/.test(asofDate)) {
+    await supabase
+      .from('contribution_settings')
+      .upsert({ id: 1, asof_date: asofDate, updated_at: new Date().toISOString() });
+  }
 
   await supabase.from('audit_log').insert({
     user_id: auth.userId,

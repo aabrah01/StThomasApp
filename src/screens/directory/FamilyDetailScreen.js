@@ -65,10 +65,13 @@ const FamilyDetailScreen = ({ route, navigation }) => {
     }
 
     if (!membersResult.error) {
-      const sorted = (membersResult.data || []).slice().sort((a, b) => {
-        if (a.isHeadOfHousehold === b.isHeadOfHousehold) return 0;
-        return a.isHeadOfHousehold ? -1 : 1;
-      });
+      const ROLE_PRIORITY = {
+        'HoH': 0, 'Son': 1, 'Daughter': 1,
+        'Son-In-Law': 2, 'Daughter-In-Law': 2,
+        'Grandparent': 3, 'Grandchild': 3, 'Other': 4,
+      };
+      const rolePriority = (m) => m.isHeadOfHousehold ? 0 : (ROLE_PRIORITY[m.role] ?? 4);
+      const sorted = (membersResult.data || []).slice().sort((a, b) => rolePriority(a) - rolePriority(b));
       setMembers(sorted);
     }
 

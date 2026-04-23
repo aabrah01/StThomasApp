@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
+  TouchableOpacity,
   FlatList,
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
-import { Calendar } from 'react-native-calendars';
+import { CalendarList } from 'react-native-calendars';
 import calendarService from '../../services/calendarService';
 import youtubeService from '../../services/youtubeService';
 import databaseService from '../../services/databaseService';
@@ -19,20 +20,24 @@ import ErrorMessage from '../../components/common/ErrorMessage';
 import theme from '../../styles/theme';
 import commonStyles from '../../styles/commonStyles';
 
+const todayString = (() => {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+})();
+
+const todayMonth = todayString.slice(0, 7) + '-01';
+
 const CalendarScreen = ({ navigation }) => {
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const calendarWidth = isTablet ? Math.min(width, 800) : width;
   const [events, setEvents] = useState([]);
   const [monthLoading, setMonthLoading] = useState(false);
   const loadedRangeRef = useRef({ min: null, max: null });
   const loadedYearsRef = useRef(new Set());
-  const [selectedDate, setSelectedDate] = useState(() => {
-    // Use local date parts to avoid UTC midnight shifting the date
-    const d = new Date();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${d.getFullYear()}-${mm}-${dd}`;
-  });
+  const [selectedDate, setSelectedDate] = useState(todayString);
   const [markedDates, setMarkedDates] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -41,7 +46,8 @@ const CalendarScreen = ({ navigation }) => {
   const [modalVideo, setModalVideo] = useState(null);
   const [videoModalVisible, setVideoModalVisible] = useState(false);
   const [churchName, setChurchName] = useState('');
-
+  const [displayedMonth, setDisplayedMonth] = useState(todayMonth);
+  const [calendarResetKey, setCalendarResetKey] = useState(0);
   useEffect(() => {
     initializeCalendar();
   }, []);
@@ -101,6 +107,7 @@ const CalendarScreen = ({ navigation }) => {
   };
 
   const handleMonthChange = async (month) => {
+    setDisplayedMonth(`${month.year}-${String(month.month).padStart(2, '0')}-01`);
     loadYoutubeVideos(month.year);
 
     const { min, max } = loadedRangeRef.current;
@@ -166,11 +173,38 @@ const CalendarScreen = ({ navigation }) => {
     setSelectedDate(day.dateString);
   };
 
-  const handleRefresh = () => {
+  const handleVisibleMonthsChange = (months) => {
+    if (months?.length > 0) handleMonthChange(months[0]);
+  };
+
+  const goToToday = () => {
+    setSelectedDate(todayString);
+    setDisplayedMonth(todayMonth);
+    setCalendarResetKey(k => k + 1);
+  };
+
+  const isCurrentMonth = displayedMonth === todayMonth;
+
+  const renderCalendarHeader = (date) => {
+    const label = date.toString('MMMM yyyy');
+    return (
+      <View style={styles.calendarHeader}>
+        <Text style={styles.calendarHeaderText}>{label}</Text>
+        {!isCurrentMonth && (
+          <TouchableOpacity onPress={goToToday} style={styles.todayButton}>
+            <Text style={styles.todayButtonText}>Today</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
+  const handleRefresh = async () => {
     setRefreshing(true);
     loadEvents();
     loadedYearsRef.current.clear();
     setVideosMap({});
+    await youtubeService.clearCache();
     loadYoutubeVideos();
   };
 
@@ -191,12 +225,20 @@ const CalendarScreen = ({ navigation }) => {
   return (
     <View style={commonStyles.container}>
       <View style={[styles.inner, isTablet && styles.innerTablet]}>
-      <Calendar
-        current={selectedDate}
+      <CalendarList
+        key={calendarResetKey}
+        current={todayMonth}
+        pagingEnabled
+        hideArrows
+        renderHeader={renderCalendarHeader}
         onDayPress={handleDayPress}
-        onMonthChange={handleMonthChange}
+        onVisibleMonthsChange={handleVisibleMonthsChange}
         markedDates={markedDates}
         markingType="multi-dot"
+        pastScrollRange={24}
+        futureScrollRange={24}
+        calendarHeight={350}
+        calendarWidth={calendarWidth}
         theme={{
           backgroundColor: theme.colors.surface,
           calendarBackground: theme.colors.surface,
@@ -213,7 +255,8 @@ const CalendarScreen = ({ navigation }) => {
           textDayFontSize: theme.fonts.sizes.md,
           textMonthFontSize: theme.fonts.sizes.lg,
         }}
-        style={styles.calendar}
+        calendarStyle={styles.calendar}
+        style={styles.calendarList}
       />
 
       <ErrorMessage message={error} style={styles.error} />
@@ -301,9 +344,35 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: '100%',
   },
+  calendarList: {
+    height: 350,
+  },
   calendar: {
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.xs,
+  },
+  calendarHeaderText: {
+    fontSize: theme.fonts.sizes.lg,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  todayButton: {
+    marginLeft: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: theme.colors.sapphire,
+  },
+  todayButtonText: {
+    fontSize: theme.fonts.sizes.xs,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   error: {
     marginHorizontal: theme.spacing.md,
