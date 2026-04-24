@@ -53,7 +53,9 @@ export async function POST(request: Request) {
     const dateStr      = String(row.date ?? '').replace(/[^0-9\-\/]/g, '').slice(0, 10);
     const amountStr    = String(row.amount ?? '').replace(/[^0-9.\-]/g, '').slice(0, 20);
     const category     = String(row.category ?? '').replace(/[\x00-\x1f]/g, '').slice(0, 100).trim() || 'General Fund';
-    const label        = membershipId || familyName || `row ${i + 1}`;
+    const label        = membershipId && familyName
+                       ? `${familyName} (${membershipId})`
+                       : membershipId || familyName || `row ${i + 1}`;
     const displayRow   = row.sourceRow ?? i + 1;
 
     if (!membershipId && !familyName) continue;

@@ -114,14 +114,15 @@ export default function ContributionsClient({ contributions: initial, families }
           const nameCell = String(row[1] ?? '').trim();
           if (!nameCell || /^total/i.test(nameCell)) continue;
 
-          const dashIdx = nameCell.lastIndexOf(' - ');
-          const membershipId = dashIdx !== -1 ? nameCell.substring(dashIdx + 3).trim() : undefined;
+          const idMatch = nameCell.match(/\s*-+\s*(\d+)\s*$/);
+          const membershipId = idMatch ? idMatch[1] : undefined;
+          const familyName = (idMatch ? nameCell.slice(0, idMatch.index) : nameCell).replace(/[-\s]+$/, '').trim();
 
           for (const { idx, name } of catCols) {
             const raw_val = row[idx];
             const amount = parseFloat(String(raw_val ?? '0').replace(/[$,]/g, ''));
             if (amount > 0) {
-              rows.push({ membershipId, date: importDate, amount: String(amount), category: name, sourceRow: r + 1 });
+              rows.push({ membershipId, familyName, date: importDate, amount: String(amount), category: name, sourceRow: r + 1 });
             }
           }
         }
