@@ -20,6 +20,7 @@ interface CsvRow {
   date: string;
   amount: string;
   category: string;
+  sourceRow?: number;
 }
 
 interface Props {
@@ -29,10 +30,12 @@ interface Props {
 
 export default function ContributionsClient({ contributions: initial, families }: Props) {
   const [contribs, setContribs] = useState(initial);
-  const [panel, setPanel] = useState<null | 'import' | 'manual'>(null);
+  const [panel, setPanel] = useState<null | 'manual'>(null);
   const [csvRows, setCsvRows] = useState<CsvRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState('');
+  const [importRowErrors, setImportRowErrors] = useState<{ row: number; reason: string; identifier: string }[]>([]);
+  const [parseError, setParseError] = useState('');
   const [importDate, setImportDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   // Manual entry state
@@ -55,6 +58,8 @@ export default function ContributionsClient({ contributions: initial, families }
         category:   lower['item'] ?? lower['category'] ?? lower['memo'] ?? 'General Fund',
       };
     }).filter(r => r.familyName && r.date && r.amount);
+    if (rows.length === 0) setParseError('No valid rows found. Check column names match: family/customer/name, date, amount/total.');
+    else setParseError('');
     setCsvRows(rows);
   };
 
@@ -63,15 +68,30 @@ export default function ContributionsClient({ contributions: initial, families }
     if (!file) return;
     const isExcel = /\.(xlsx|xls)$/i.test(file.name);
     const reader = new FileReader();
+    setParseError('');
 
     if (isExcel) {
       reader.onload = ev => {
         const data = new Uint8Array(ev.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        // QuickBooks exports include a "tips" sheet first — pick the sheet with the most rows
+        const sheetName = workbook.SheetNames.reduce((best, name) => {
+          const s = workbook.Sheets[name];
+          const ref = s['!ref'];
+          if (!ref) return best;
+          const rows = XLSX.utils.decode_range(ref).e.r;
+          const bestRows = workbook.Sheets[best]['!ref']
+            ? XLSX.utils.decode_range(workbook.Sheets[best]['!ref']!).e.r
+            : 0;
+          return rows > bestRows ? name : best;
+        }, workbook.SheetNames[0]);
+        const sheet = workbook.Sheets[sheetName];
 
         const raw = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1, defval: '' });
-        if (raw.length < 3) return;
+        if (raw.length < 3) {
+          setParseError('File must have at least 3 rows (group header, column header, data).');
+          return;
+        }
 
         const groupHeaders = (raw[0] as (string | number)[]).map(h => String(h ?? '').trim());
         const headers      = (raw[1] as (string | number)[]).map(h => String(h ?? '').trim());
@@ -79,6 +99,7 @@ export default function ContributionsClient({ contributions: initial, families }
         const catCols: { idx: number; name: string }[] = [];
         for (let i = 3; i < headers.length; i++) {
           const h = headers[i];
+          if (/^total income$/i.test(h)) break;
           if (!h || /^total/i.test(h)) continue;
           const isSubAccount = /^\(.*\)$/.test(h);
           const name = isSubAccount
@@ -100,10 +121,12 @@ export default function ContributionsClient({ contributions: initial, families }
             const raw_val = row[idx];
             const amount = parseFloat(String(raw_val ?? '0').replace(/[$,]/g, ''));
             if (amount > 0) {
-              rows.push({ membershipId, date: importDate, amount: String(amount), category: name });
+              rows.push({ membershipId, date: importDate, amount: String(amount), category: name, sourceRow: r + 1 });
             }
           }
         }
+        if (rows.length === 0) setParseError('No valid rows found. Check that the file matches the expected QuickBooks export format.');
+        else setParseError('');
         setCsvRows(rows);
       };
       reader.readAsArrayBuffer(file);
@@ -122,19 +145,28 @@ export default function ContributionsClient({ contributions: initial, families }
       };
       reader.readAsText(file);
     }
+    e.target.value = '';
   };
 
   const handleImport = async () => {
     setImporting(true);
+    setImportRowErrors([]);
     const res = await fetch('/api/contributions/import', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rows: csvRows, asofDate: importDate }),
     });
     const json = await res.json();
-    setImportResult(res.ok ? `Imported ${json.count} contributions.` : json.error);
+    if (res.ok) {
+      const skipped = json.rowErrors?.length ?? 0;
+      setImportResult(`Imported ${json.count} contribution${json.count !== 1 ? 's' : ''}${skipped > 0 ? ` — ${skipped} row${skipped !== 1 ? 's' : ''} skipped` : ''}.`);
+      setImportRowErrors(json.rowErrors ?? []);
+      setCsvRows([]);
+    } else {
+      setImportResult(json.error ?? 'Import failed.');
+      setImportRowErrors(json.rowErrors ?? []);
+    }
     setImporting(false);
-    if (res.ok) setCsvRows([]);
   };
 
   const handleManualSave = async (e: React.FormEvent) => {
@@ -171,12 +203,9 @@ export default function ContributionsClient({ contributions: initial, families }
   return (
     <div className="space-y-4">
       {/* Import panel */}
-      {panel === 'import' && (
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 space-y-4">
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-gray-900">Import from QuickBooks</h2>
-            <button onClick={() => { setPanel(null); setCsvRows([]); setImportResult(''); }}
-              className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
           </div>
           <p className="text-sm text-gray-500">
             Supports QuickBooks CSV (transaction rows) and Excel summary exports (one row per family, categories as columns).
@@ -189,6 +218,8 @@ export default function ContributionsClient({ contributions: initial, families }
           </div>
           <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileParse}
             className="text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#2B5CE6] file:text-white hover:file:bg-[#1E47C8]" />
+
+          {parseError && <p className="text-sm text-red-600">{parseError}</p>}
 
           {csvRows.length > 0 && (
             <>
@@ -219,25 +250,40 @@ export default function ContributionsClient({ contributions: initial, families }
                   </table>
                 </div>
               </div>
-              {importResult && (
-                <p className={`text-sm ${importResult.startsWith('Imported') ? 'text-green-600' : 'text-red-600'}`}>
-                  {importResult}
-                </p>
-              )}
               <div className="flex gap-3">
                 <button onClick={handleImport} disabled={importing}
                   className="bg-[#2B5CE6] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#1E47C8] transition-colors disabled:opacity-50">
                   {importing ? 'Importing…' : `Import ${csvRows.length} Rows`}
                 </button>
-                <button onClick={() => { setCsvRows([]); setImportResult(''); }} disabled={importing}
+                <button onClick={() => { setCsvRows([]); setImportResult(''); setImportRowErrors([]); setParseError(''); }} disabled={importing}
                   className="text-sm font-semibold px-5 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">
                   Clear
                 </button>
               </div>
             </>
           )}
+
+          {importResult && (
+            <div className="space-y-2">
+              <p className={`text-sm font-medium ${importResult.startsWith('Imported') ? 'text-green-600' : 'text-red-600'}`}>
+                {importResult}
+              </p>
+              {importRowErrors.length > 0 && (
+                <div className="border border-amber-200 rounded-lg bg-amber-50 p-3 space-y-1 max-h-40 overflow-y-auto">
+                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Skipped rows</p>
+                  {importRowErrors.slice(0, 50).map((e, i) => (
+                    <p key={i} className="text-xs text-amber-800">
+                      <span className="font-medium">Row {e.row}</span> — {e.reason}{e.identifier ? ` (${e.identifier})` : ''}
+                    </p>
+                  ))}
+                  {importRowErrors.length > 50 && (
+                    <p className="text-xs text-amber-600">…and {importRowErrors.length - 50} more</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
 
       {/* Manual entry panel */}
       {panel === 'manual' && (
@@ -302,10 +348,6 @@ export default function ContributionsClient({ contributions: initial, families }
             YTD: ${ytdTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </span>
           <div className="flex gap-2 ml-auto">
-            <button onClick={() => setPanel(panel === 'import' ? null : 'import')}
-              className="text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors">
-              Import
-            </button>
             <button onClick={() => setPanel(panel === 'manual' ? null : 'manual')}
               className="text-sm font-semibold px-3 py-1.5 rounded-lg bg-[#2B5CE6] text-white hover:bg-[#1E47C8] transition-colors">
               + Add Entry

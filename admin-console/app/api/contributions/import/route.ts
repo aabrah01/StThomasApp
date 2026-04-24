@@ -11,13 +11,14 @@ interface CsvRow {
   date: string;
   amount: string;
   category: string;
+  sourceRow?: number;
 }
 
 export async function POST(request: Request) {
   const auth = await requireAdmin();
   if (isError(auth)) return auth;
 
-  if ((request.headers.get('content-length') ?? '0') > String(MAX_BODY)) {
+  if (Number(request.headers.get('content-length') ?? '0') > MAX_BODY) {
     return NextResponse.json({ error: 'Request too large' }, { status: 413 });
   }
 
@@ -41,34 +42,56 @@ export async function POST(request: Request) {
 
   const toInsert = [];
   const unmatched: string[] = [];
+  const rowErrors: { row: number; reason: string; identifier: string }[] = [];
+  const reportedUnmatched = new Set<string>();
 
-  for (const row of rows) {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
     // Sanitize inputs — strip control characters and limit lengths
     const membershipId = String(row.membershipId ?? '').replace(/[\x00-\x1f]/g, '').slice(0, 50).trim();
     const familyName   = String(row.familyName ?? '').replace(/[\x00-\x1f]/g, '').slice(0, 100).trim();
     const dateStr      = String(row.date ?? '').replace(/[^0-9\-\/]/g, '').slice(0, 10);
     const amountStr    = String(row.amount ?? '').replace(/[^0-9.\-]/g, '').slice(0, 20);
     const category     = String(row.category ?? '').replace(/[\x00-\x1f]/g, '').slice(0, 100).trim() || 'General Fund';
+    const label        = membershipId || familyName || `row ${i + 1}`;
+    const displayRow   = row.sourceRow ?? i + 1;
 
     if (!membershipId && !familyName) continue;
 
     // Prefer membership_id lookup; fall back to family name (case-insensitive)
     const familyId = (membershipId ? byMembershipId.get(membershipId) : undefined)
                   ?? (familyName   ? byFamilyName.get(familyName.toLowerCase()) : undefined);
-    if (!familyId) { unmatched.push(membershipId || familyName); continue; }
+    if (!familyId) {
+      unmatched.push(membershipId || familyName);
+      // One error per family, not one per category row
+      if (!reportedUnmatched.has(label)) {
+        reportedUnmatched.add(label);
+        rowErrors.push({ row: displayRow, reason: 'Family not found', identifier: label });
+      }
+      continue;
+    }
 
     const amount = parseFloat(amountStr.replace(/[$,]/g, ''));
-    if (isNaN(amount) || amount <= 0 || amount > 1_000_000) continue;
+    if (isNaN(amount) || amount <= 0 || amount > 1_000_000) {
+      rowErrors.push({ row: displayRow, reason: `Invalid amount "${row.amount}"`, identifier: label });
+      continue;
+    }
 
     // Validate date format
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr) && !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr) && !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateStr)) {
+      rowErrors.push({ row: displayRow, reason: `Invalid date "${row.date}"`, identifier: label });
+      continue;
+    }
 
     toInsert.push({ family_id: familyId, date: dateStr, amount, category });
   }
 
   if (!toInsert.length) {
     const sample = [...new Set(unmatched)].slice(0, 5).join(', ');
-    return NextResponse.json({ error: `No rows matched families. Check family names match exactly. Unmatched: ${sample}` }, { status: 400 });
+    return NextResponse.json(
+      { error: `No rows matched families. Check family names match exactly. Unmatched: ${sample}`, rowErrors },
+      { status: 400 }
+    );
   }
 
   // Delete all existing contributions before inserting — QB export is always a full YTD file
@@ -92,5 +115,5 @@ export async function POST(request: Request) {
     details: { count: toInsert.length, unmatched: [...new Set(unmatched)].slice(0, 20) },
   });
 
-  return NextResponse.json({ count: toInsert.length, unmatched: [...new Set(unmatched)] });
+  return NextResponse.json({ count: toInsert.length, unmatched: [...new Set(unmatched)], rowErrors });
 }
