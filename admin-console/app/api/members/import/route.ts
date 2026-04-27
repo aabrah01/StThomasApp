@@ -109,13 +109,16 @@ export async function POST(request: Request) {
     .map(fid => existingMap.get(fid)!);
 
   // Fetch existing family + member data for real diffing
+  type FamRow = { id: string; membership_id: string; family_name: string; address: string | null; city: string | null; state: string | null; zip: string | null; is_active: boolean };
+  type MemRow = { family_id: string; first_name: string; last_name: string; alias: string | null; email: string | null; phone_number: string | null; role: string | null; is_head_of_household: boolean; is_active: boolean };
+
   const [{ data: existingFamRows }, { data: existingMemRows }] = await Promise.all([
     matchingDbIds.length
       ? supabase.from('families').select('id, membership_id, family_name, address, city, state, zip, is_active').in('id', matchingDbIds)
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [] as FamRow[] }),
     matchingDbIds.length
       ? supabase.from('members').select('family_id, first_name, last_name, alias, email, phone_number, role, is_head_of_household, is_active').in('family_id', matchingDbIds)
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [] as MemRow[] }),
   ]);
 
   const existingFamByMid = new Map<string, typeof existingFamRows[0]>();
