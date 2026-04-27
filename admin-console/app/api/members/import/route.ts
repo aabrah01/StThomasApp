@@ -121,11 +121,11 @@ export async function POST(request: Request) {
       : Promise.resolve({ data: [] as MemRow[] }),
   ]);
 
-  const existingFamByMid = new Map<string, typeof existingFamRows[0]>();
-  for (const f of existingFamRows ?? []) existingFamByMid.set(f.membership_id, f);
+  const existingFamByMid = new Map<string, FamRow>();
+  for (const f of (existingFamRows ?? []) as FamRow[]) existingFamByMid.set(f.membership_id, f);
 
-  const existingMembersByFamId = new Map<string, typeof existingMemRows>();
-  for (const m of existingMemRows ?? []) {
+  const existingMembersByFamId = new Map<string, MemRow[]>();
+  for (const m of (existingMemRows ?? []) as MemRow[]) {
     if (!existingMembersByFamId.has(m.family_id)) existingMembersByFamId.set(m.family_id, []);
     existingMembersByFamId.get(m.family_id)!.push(m);
   }
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
   const normPhone = (p: string | null) => (p ?? '').replace(/\D/g, '');
   const normStr   = (s: string | null) => (s ?? '').trim().toLowerCase();
 
-  const normDbMember   = (m: typeof existingMemRows[0]) =>
+  const normDbMember   = (m: MemRow) =>
     [normStr(m.first_name), normStr(m.last_name), normStr(m.alias), normStr(m.email),
      normPhone(m.phone_number), normStr(m.role), m.is_head_of_household ? '1' : '0', m.is_active ? '1' : '0'].join('|');
 
