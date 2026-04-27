@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 
 interface Contribution {
@@ -46,6 +46,24 @@ export default function ContributionsClient({ contributions: initial, families }
   const [saving, setSaving] = useState(false);
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [search, setSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<typeof initial | null>(null);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const q = search.trim();
+    if (!q) { setSearchResults(null); return; }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(`/api/contributions?q=${encodeURIComponent(q)}&year=${filterYear}`);
+        if (res.ok) setSearchResults(await res.json());
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+  }, [search, filterYear]);
 
   const parseRowsFromSheet = (data: Record<string, string>[]) => {
     const rows: CsvRow[] = data.map(row => {
@@ -163,6 +181,8 @@ export default function ContributionsClient({ contributions: initial, families }
       setImportResult(`Imported ${json.count} contribution${json.count !== 1 ? 's' : ''}${skipped > 0 ? ` — ${skipped} row${skipped !== 1 ? 's' : ''} skipped` : ''}.`);
       setImportRowErrors(json.rowErrors ?? []);
       setCsvRows([]);
+      setSearchResults(null);
+      setSearch('');
     } else {
       setImportResult(json.error ?? 'Import failed.');
       setImportRowErrors(json.rowErrors ?? []);
@@ -194,11 +214,10 @@ export default function ContributionsClient({ contributions: initial, families }
     setSaving(false);
   };
 
-  const q = search.trim().toLowerCase();
-  const filtered = contribs.filter(c =>
-    c.fiscalYear === filterYear &&
-    (!q || c.familyName.toLowerCase().includes(q) || c.membershipId?.toLowerCase().includes(q) || c.category.toLowerCase().includes(q))
-  );
+  const q = search.trim();
+  const filtered = searchResults !== null
+    ? searchResults
+    : contribs.filter(c => c.fiscalYear === filterYear);
   const ytdTotal = filtered.reduce((s, c) => s + c.amount, 0);
 
   return (
@@ -377,7 +396,10 @@ export default function ContributionsClient({ contributions: initial, families }
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && (
+            {searching && (
+              <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400">Searching…</td></tr>
+            )}
+            {!searching && filtered.length === 0 && (
               <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400">{q ? 'No results found.' : `No contributions for ${filterYear}.`}</td></tr>
             )}
           </tbody>

@@ -27,6 +27,9 @@ const MemberList = ({ members }) => {
               <Text style={styles.memberName}>
                 {member.firstName} {member.lastName}
               </Text>
+              {member.alias ? (
+                <Text style={styles.memberNickname}>"{member.alias}"</Text>
+              ) : null}
               {member.role ? (
                 <View style={styles.roleBadge}>
                   <Text style={styles.memberRole}>{member.role}</Text>
@@ -83,6 +86,12 @@ const styles = StyleSheet.create({
     fontSize: theme.fonts.sizes.lg,
     fontWeight: '600',
     color: theme.colors.text,
+    marginBottom: 4,
+  },
+  memberNickname: {
+    fontSize: theme.fonts.sizes.sm,
+    color: theme.colors.textSecondary,
+    fontStyle: 'italic',
     marginBottom: 4,
   },
   roleBadge: {

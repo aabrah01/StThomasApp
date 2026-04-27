@@ -40,6 +40,7 @@ const mapMember = (row) => ({
   familyId: row.family_id,
   firstName: row.first_name,
   lastName: row.last_name,
+  alias: row.alias ?? null,
   email: row.email,
   phoneNumber: row.phone_number,
   role: row.role,
@@ -108,7 +109,7 @@ class DatabaseService {
 
     const { data, error } = await supabase
       .from('families')
-      .select('*, members(id, first_name, phone_number, is_head_of_household, created_at)')
+      .select('*, members(id, first_name, alias, phone_number, is_head_of_household, created_at)')
       .eq('is_active', true)
       .order('family_name', { ascending: true });
 
@@ -121,6 +122,7 @@ class DatabaseService {
           .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
         family.hohNames = hohMembers.map(m => m.first_name).join(' & ') || null;
         family.memberFirstNames = (row.members || []).map(m => m.first_name);
+        family.memberAliases = (row.members || []).map(m => m.alias).filter(Boolean);
         family.memberPhoneNumbers = (row.members || []).map(m => m.phone_number).filter(Boolean);
         return family;
       }),

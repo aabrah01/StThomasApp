@@ -74,7 +74,7 @@ const MainTabs = () => {
         name="Directory"
         component={DirectoryListScreen}
         options={{
-          title: 'Church Directory',
+          title: 'Parish Directory',
           tabBarLabel: 'Directory',
           tabBarIcon: ({ focused }) => <TabIcon name="people" focused={focused} />,
         }}
@@ -83,7 +83,7 @@ const MainTabs = () => {
         name="Calendar"
         component={CalendarScreen}
         options={{
-          title: 'Church Events',
+          title: 'Parish Events',
           tabBarLabel: 'Calendar',
           tabBarIcon: ({ focused }) => <TabIcon name="calendar" focused={focused} />,
         }}

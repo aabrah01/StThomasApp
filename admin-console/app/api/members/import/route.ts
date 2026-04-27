@@ -9,6 +9,7 @@ interface CsvRow {
   Alias: string;
   DOB: string;
   MemStatus: string;
+  Relationship: string;
   Street: string;
   City: string;
   Zip: string;
@@ -26,6 +27,19 @@ function splitName(full: string): { first: string; last: string } {
   const last = parts.pop()!;
   return { first: parts.join(' '), last };
 }
+
+const RELATIONSHIP_LABELS: Record<string, string> = {
+  HOH: 'HoH',
+  MOM: 'Mother',
+  DAD: 'Father',
+  SON: 'Son',
+  DTR: 'Daughter',
+  DIL: 'Daughter-in-Law',
+  SIL: 'Son-in-Law',
+  GSN: 'Grandson',
+  GDR: 'Granddaughter',
+  BRO: 'Brother',
+};
 
 /** Find the most common last name in a group of rows to use as the family name */
 function deriveFamilyName(rows: CsvRow[]): string {
@@ -47,7 +61,7 @@ export async function POST(request: Request) {
   const auth = await requireAdmin();
   if (isError(auth)) return auth;
 
-  const { rows, mode }: { rows: CsvRow[]; mode: 'preview' | 'import' } = await request.json();
+  const { rows, mode, skipFamilyIds = [] }: { rows: CsvRow[]; mode: 'preview' | 'import'; skipFamilyIds: string[] } = await request.json();
 
   if (!Array.isArray(rows)) {
     return NextResponse.json({ error: 'rows must be an array' }, { status: 400 });
@@ -85,27 +99,93 @@ export async function POST(request: Request) {
     skipped: 0,
   };
 
-  // Count new vs updated for preview
-  for (const [fid] of grouped) {
-    if (existingMap.has(fid)) summary.updatedFamilies++;
-    else summary.newFamilies++;
+  // Classify each family as new, changed, or unchanged
+  const newFamilyIds = new Set<string>();
+  const updatedFamilyIds = new Set<string>();
+  const unchangedFamilyIds = new Set<string>();
+
+  const matchingDbIds = [...grouped.keys()]
+    .filter(fid => existingMap.has(fid))
+    .map(fid => existingMap.get(fid)!);
+
+  // Fetch existing family + member data for real diffing
+  const [{ data: existingFamRows }, { data: existingMemRows }] = await Promise.all([
+    matchingDbIds.length
+      ? supabase.from('families').select('id, membership_id, family_name, address, city, state, zip, is_active').in('id', matchingDbIds)
+      : Promise.resolve({ data: [] }),
+    matchingDbIds.length
+      ? supabase.from('members').select('family_id, first_name, last_name, alias, email, phone_number, role, is_head_of_household, is_active').in('family_id', matchingDbIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const existingFamByMid = new Map<string, typeof existingFamRows[0]>();
+  for (const f of existingFamRows ?? []) existingFamByMid.set(f.membership_id, f);
+
+  const existingMembersByFamId = new Map<string, typeof existingMemRows>();
+  for (const m of existingMemRows ?? []) {
+    if (!existingMembersByFamId.has(m.family_id)) existingMembersByFamId.set(m.family_id, []);
+    existingMembersByFamId.get(m.family_id)!.push(m);
+  }
+
+  const normPhone = (p: string | null) => (p ?? '').replace(/\D/g, '');
+  const normStr   = (s: string | null) => (s ?? '').trim().toLowerCase();
+
+  const normDbMember   = (m: typeof existingMemRows[0]) =>
+    [normStr(m.first_name), normStr(m.last_name), normStr(m.alias), normStr(m.email),
+     normPhone(m.phone_number), normStr(m.role), m.is_head_of_household ? '1' : '0', m.is_active ? '1' : '0'].join('|');
+
+  const normCsvMember  = (row: CsvRow) => {
+    const { first, last } = splitName(row.Name);
+    const relKey = row.Relationship?.trim().toUpperCase() || '';
+    const role = RELATIONSHIP_LABELS[relKey] ?? (relKey || '');
+    return [normStr(first.slice(0, 50)), normStr(last.slice(0, 50)), normStr(row.Alias?.trim()),
+            normStr(row.Email?.trim()), normPhone(row.CellPhone?.trim()), normStr(role),
+            relKey === 'HOH' ? '1' : '0', row.MemStatus === 'Active' ? '1' : '0'].join('|');
+  };
+
+  for (const [fid, csvRows] of grouped) {
+    if (!existingMap.has(fid)) { newFamilyIds.add(fid); summary.newFamilies++; continue; }
+
+    const dbFam = existingFamByMid.get(fid)!;
+    const dbMembers = existingMembersByFamId.get(dbFam.id) ?? [];
+    const rep = csvRows[0];
+    const csvFamName = deriveFamilyName(csvRows);
+
+    let changed =
+      dbFam.family_name !== csvFamName ||
+      normStr(dbFam.address) !== normStr(rep.Street) ||
+      normStr(dbFam.city)    !== normStr(rep.City)   ||
+      normStr(dbFam.state)   !== normStr(rep.State)  ||
+      normStr(dbFam.zip)     !== normStr(rep.Zip)    ||
+      dbFam.is_active        !== (rep.FamStatus === 'Active') ||
+      dbMembers.length       !== csvRows.length;
+
+    if (!changed) {
+      const dbSet = new Set(dbMembers.map(normDbMember));
+      changed = csvRows.some(r => !dbSet.has(normCsvMember(r)));
+    }
+
+    if (changed) { updatedFamilyIds.add(fid); summary.updatedFamilies++; }
+    else          { unchangedFamilyIds.add(fid); }
   }
 
   if (mode === 'preview') {
-    return NextResponse.json({ summary, familyIds: [...grouped.keys()] });
+    return NextResponse.json({ summary, newFamilyIds: [...newFamilyIds], updatedFamilyIds: [...updatedFamilyIds], unchangedFamilyIds: [...unchangedFamilyIds] });
   }
 
   // --- Actual import ---
   const errors: string[] = [];
+  const skipSet = new Set(skipFamilyIds);
 
   for (const [familyId, familyRows] of grouped) {
+    if (skipSet.has(familyId)) continue;
     const rep = familyRows[0]; // representative row for address
     const familyName = deriveFamilyName(familyRows);
 
     let dbFamilyId: string;
-    // Keyed by lowercase email → { user_id, is_hoh } for members that have an
-    // auth link or HOH flag. Restored after delete+reinsert using new member IDs.
-    let preserved = new Map<string, { user_id: string | null; is_hoh: boolean }>();
+    // Keyed by lowercase email → user_id for members with an auth account link.
+    // Restored after delete+reinsert using new member IDs.
+    let preserved = new Map<string, string>();
 
     if (existingMap.has(familyId)) {
       // Update existing family
@@ -124,20 +204,21 @@ export async function POST(request: Request) {
 
       if (famErr) { errors.push(`Family ${familyId}: ${famErr.message}`); continue; }
 
-      // Snapshot member_users links and is_head_of_household before wiping members.
+      // Snapshot member_users links before wiping members. HOH status comes from
+      // the CSV Relationship column, so only user account links need restoring.
       // The ON DELETE CASCADE on member_users.member_id removes junction rows when
       // members are deleted, so we re-insert them after using the new member IDs.
       const { data: existingMembers } = await supabase
         .from('members')
-        .select('email, is_head_of_household, member_users(user_id)')
+        .select('email, member_users(user_id)')
         .eq('family_id', dbFamilyId);
 
       for (const m of existingMembers ?? []) {
         if (!m.email) continue;
         const linked = (m.member_users as { user_id: string }[] ?? []);
         const user_id = linked[0]?.user_id ?? null;
-        if (user_id || m.is_head_of_household) {
-          preserved.set(m.email.toLowerCase(), { user_id, is_hoh: m.is_head_of_household });
+        if (user_id) {
+          preserved.set(m.email.toLowerCase(), user_id);
         }
       }
 
@@ -167,14 +248,18 @@ export async function POST(request: Request) {
     // Insert members
     const memberInserts = familyRows.map(row => {
       const { first, last } = splitName(row.Name);
+      const relKey = row.Relationship?.trim().toUpperCase() || '';
+      const role = RELATIONSHIP_LABELS[relKey] ?? (relKey || null);
       return {
         family_id: dbFamilyId,
         first_name: first.slice(0, 50),
         last_name: last.slice(0, 50),
+        alias: row.Alias?.trim() || null,
         email: row.Email?.trim() || null,
         phone_number: row.CellPhone?.trim() || null,
         is_active: row.MemStatus === 'Active',
-        is_head_of_household: false,
+        role,
+        is_head_of_household: relKey === 'HOH',
       };
     });
 
@@ -184,34 +269,24 @@ export async function POST(request: Request) {
     } else {
       summary.newMembers += memberInserts.length;
 
-      // Restore is_head_of_household and member_users links for members whose
-      // email matched a preserved record. Fetch newly inserted IDs first since
-      // the delete+reinsert cycle assigned new UUIDs.
+      // Restore member_users links for members whose email matched a preserved
+      // record. Fetch newly inserted IDs first since delete+reinsert assigns new UUIDs.
       if (preserved.size > 0) {
         const { data: newMembers } = await supabase
           .from('members')
-          .select('id, email, is_head_of_household')
+          .select('id, email')
           .eq('family_id', dbFamilyId);
 
         for (const nm of newMembers ?? []) {
           const email = nm.email?.toLowerCase();
           if (!email) continue;
-          const snap = preserved.get(email);
-          if (!snap) continue;
+          const userId = preserved.get(email);
+          if (!userId) continue;
 
-          if (snap.is_hoh && !nm.is_head_of_household) {
-            await supabase
-              .from('members')
-              .update({ is_head_of_household: true })
-              .eq('id', nm.id);
-          }
-
-          if (snap.user_id) {
-            const { error: linkErr } = await supabase
-              .from('member_users')
-              .upsert({ user_id: snap.user_id, member_id: nm.id }, { onConflict: 'user_id,member_id' });
-            if (linkErr) errors.push(`Restore user link for ${email}: ${linkErr.message}`);
-          }
+          const { error: linkErr } = await supabase
+            .from('member_users')
+            .upsert({ user_id: userId, member_id: nm.id }, { onConflict: 'user_id,member_id' });
+          if (linkErr) errors.push(`Restore user link for ${email}: ${linkErr.message}`);
         }
       }
     }

@@ -3,6 +3,56 @@ import { requireAdmin, isError } from '@/lib/requireAdmin';
 import { validateAmount, validateDate, validateString, firstError } from '@/lib/validate';
 import { NextResponse } from 'next/server';
 
+export async function GET(request: Request) {
+  const auth = await requireAdmin();
+  if (isError(auth)) return auth;
+
+  const { searchParams } = new URL(request.url);
+  const q    = searchParams.get('q')?.trim() ?? '';
+  const year = parseInt(searchParams.get('year') ?? '0', 10);
+
+  const supabase = createAdminSupabase();
+  let query = supabase
+    .from('contributions')
+    .select('*, families(family_name, membership_id)')
+    .order('date', { ascending: false })
+    .limit(500);
+
+  if (year) {
+    query = query.eq('fiscal_year', year);
+  }
+
+  if (q) {
+    const { data: matchedFamilies } = await supabase
+      .from('families')
+      .select('id')
+      .or(`family_name.ilike.%${q}%,membership_id.ilike.%${q}%`);
+    const familyIds = (matchedFamilies ?? []).map(f => f.id);
+
+    if (familyIds.length > 0) {
+      query = query.or(`category.ilike.%${q}%,family_id.in.(${familyIds.join(',')})`);
+    } else {
+      query = query.ilike('category', `%${q}%`);
+    }
+  }
+
+  const { data, error } = await query;
+  if (error) return NextResponse.json({ error: 'Query failed' }, { status: 500 });
+
+  const contribs = (data ?? []).map(c => ({
+    id: c.id,
+    familyId: c.family_id,
+    membershipId: (c.families as { family_name: string; membership_id: string } | null)?.membership_id ?? '—',
+    familyName: (c.families as { family_name: string; membership_id: string } | null)?.family_name ?? '—',
+    date: c.date,
+    amount: c.amount,
+    category: c.category,
+    fiscalYear: c.fiscal_year,
+  }));
+
+  return NextResponse.json(contribs);
+}
+
 export async function POST(request: Request) {
   const auth = await requireAdmin();
   if (isError(auth)) return auth;

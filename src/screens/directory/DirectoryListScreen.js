@@ -67,6 +67,7 @@ const DirectoryListScreen = ({ navigation }) => {
       families.filter((f) =>
         f.familyName.toLowerCase().includes(query) ||
         (f.memberFirstNames && f.memberFirstNames.some(n => n.toLowerCase().includes(query))) ||
+        (f.memberAliases && f.memberAliases.some(a => a.toLowerCase().includes(query))) ||
         (f.membershipId && f.membershipId.toLowerCase().includes(query)) ||
         (f.memberPhoneNumbers && f.memberPhoneNumbers.some(p =>
           p.toLowerCase().includes(query) ||

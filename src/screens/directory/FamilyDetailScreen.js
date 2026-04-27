@@ -66,11 +66,14 @@ const FamilyDetailScreen = ({ route, navigation }) => {
 
     if (!membersResult.error) {
       const ROLE_PRIORITY = {
-        'HoH': 0, 'Son': 1, 'Daughter': 1,
-        'Son-In-Law': 2, 'Daughter-In-Law': 2,
-        'Grandparent': 3, 'Grandchild': 3, 'Other': 4,
+        'HoH': 0,
+        'Mother': 1, 'Father': 1,
+        'Son': 2, 'Daughter': 2,
+        'Son-in-Law': 3, 'Daughter-in-Law': 3,
+        'Grandson': 4, 'Granddaughter': 4,
+        'Brother': 5,
       };
-      const rolePriority = (m) => m.isHeadOfHousehold ? 0 : (ROLE_PRIORITY[m.role] ?? 4);
+      const rolePriority = (m) => m.isHeadOfHousehold ? 0 : (ROLE_PRIORITY[m.role] ?? 6);
       const sorted = (membersResult.data || []).slice().sort((a, b) => rolePriority(a) - rolePriority(b));
       setMembers(sorted);
     }

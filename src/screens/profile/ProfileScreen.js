@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Image,
   Platform,
-  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -151,15 +150,8 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const handleZelle = async () => {
-    try {
-      await Linking.openURL('zelle://');
-    } catch {
-      Alert.alert(
-        'Donate via Zelle',
-        "Open your banking app's Zelle feature and send to:\n\ndonate@stthomasli.org",
-        [{ text: 'OK' }]
-      );
-    }
+    await Clipboard.setStringAsync('donate@stthomasli.org');
+    Alert.alert('Copied', 'Zelle email copied to clipboard.');
   };
 
   return (
@@ -256,10 +248,6 @@ const ProfileScreen = ({ navigation }) => {
           <TouchableOpacity
             style={[styles.row, styles.lastRow]}
             onPress={handleZelle}
-            onLongPress={() => {
-              Clipboard.setStringAsync('donate@stthomasli.org');
-              Alert.alert('Copied', 'Zelle email copied to clipboard.');
-            }}
           >
             <View style={styles.iconBox}>
               <Text style={styles.rowIcon}>💙</Text>

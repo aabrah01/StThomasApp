@@ -27,6 +27,7 @@ create table members (
   last_name             text not null,
   email                 text,
   phone_number          text,
+  alias                 text,
   role                  text,
   is_head_of_household  boolean default false,  -- gates access to YTD contribution data
   is_active             boolean default true,
