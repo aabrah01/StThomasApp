@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -68,6 +69,13 @@ const MainTabs = () => {
         headerTintColor: theme.colors.text,
         headerTitleStyle: HEADER_TITLE_STYLE,
         headerTitleAlign: 'center',
+        headerRight: () => (
+          <Image
+            source={require('../../assets/icon_transparent.png')}
+            style={{ width: 40, height: 40, marginRight: 12 }}
+            resizeMode="contain"
+          />
+        ),
       }}
     >
       <Tab.Screen

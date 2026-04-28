@@ -90,7 +90,7 @@ function LoginForm() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6] focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7E282F] focus:border-transparent"
               placeholder="admin@example.com"
             />
           </div>
@@ -102,7 +102,7 @@ function LoginForm() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2B5CE6] focus:border-transparent pr-10"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7E282F] focus:border-transparent pr-10"
                 placeholder="••••••••"
               />
               <button
@@ -122,7 +122,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#2B5CE6] text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-[#1E47C8] transition-colors disabled:opacity-60"
+            className="w-full bg-[#7E282F] text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-[#6B2228] transition-colors disabled:opacity-60"
           >
             {loading ? 'Signing in…' : 'Sign In'}
           </button>

@@ -145,7 +145,7 @@ const CalendarScreen = ({ navigation }) => {
       // Split directly on 'T' — avoids UTC conversion shifting the date
       const date = event.startDate.split('T')[0];
       if (!marked[date]) {
-        marked[date] = { dots: [{ key: 'event', color: theme.colors.sapphire }] };
+        marked[date] = { dots: [{ key: 'event', color: theme.colors.sapphire, selectedDotColor: '#FFFFFF' }] };
       }
     });
 
@@ -155,7 +155,7 @@ const CalendarScreen = ({ navigation }) => {
       if (!alreadyHasVideo) {
         marked[date] = {
           ...marked[date],
-          dots: [...existing, { key: 'video', color: theme.colors.accent }],
+          dots: [...existing, { key: 'video', color: '#CC181E', selectedDotColor: '#FFFFFF' }],
         };
       }
     });
@@ -247,6 +247,7 @@ const CalendarScreen = ({ navigation }) => {
           todayTextColor: theme.colors.sapphire,
           todayBackgroundColor: theme.colors.primaryLight,
           dotColor: theme.colors.sapphire,
+          selectedDotColor: '#FFFFFF',
           arrowColor: theme.colors.sapphire,
           monthTextColor: theme.colors.text,
           textDayFontWeight: '500',
@@ -278,47 +279,48 @@ const CalendarScreen = ({ navigation }) => {
           )}
         </View>
 
-        {totalCount === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📭</Text>
-            <Text style={styles.emptyText}>No events on this day</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={selectedEvents}
-            keyExtractor={(item) => item.id}
-            ListHeaderComponent={
-              selectedVideos.length > 0 ? (
-                <>
-                  {selectedVideos.map((video) => (
-                    <HomiliesCard
-                      key={video.videoId}
-                      video={video}
-                      onPress={() => {
-                        setModalVideo(video);
-                        setVideoModalVisible(true);
-                      }}
-                    />
-                  ))}
-                </>
-              ) : null
-            }
-            renderItem={({ item }) => (
-              <EventCard
-                event={item}
-                onPress={() => navigation.navigate('EventDetail', { event: item })}
-              />
-            )}
-            contentContainerStyle={styles.eventsList}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                tintColor={theme.colors.sapphire}
-              />
-            }
-          />
-        )}
+        <FlatList
+          data={selectedEvents}
+          keyExtractor={(item) => item.id}
+          ListHeaderComponent={
+            selectedVideos.length > 0 ? (
+              <>
+                {selectedVideos.map((video) => (
+                  <HomiliesCard
+                    key={video.videoId}
+                    video={video}
+                    onPress={() => {
+                      setModalVideo(video);
+                      setVideoModalVisible(true);
+                    }}
+                  />
+                ))}
+              </>
+            ) : null
+          }
+          ListEmptyComponent={
+            selectedVideos.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>📭</Text>
+                <Text style={styles.emptyText}>No events on this day</Text>
+              </View>
+            ) : null
+          }
+          renderItem={({ item }) => (
+            <EventCard
+              event={item}
+              onPress={() => navigation.navigate('EventDetail', { event: item })}
+            />
+          )}
+          contentContainerStyle={styles.eventsList}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.sapphire}
+            />
+          }
+        />
       </View>
       </View>
 

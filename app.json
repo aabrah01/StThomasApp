@@ -9,7 +9,11 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F8F7F4"
+      "backgroundColor": "#F5EFE0",
+      "dark": {
+        "image": "./assets/splash_dark.png",
+        "backgroundColor": "#120A0C"
+      }
     },
     "assetBundlePatterns": [
       "**/*"
@@ -27,11 +31,15 @@
       "splash": {
         "image": "./assets/android_splash.png",
         "resizeMode": "contain",
-        "backgroundColor": "#F8F7F4"
+        "backgroundColor": "#F5EFE0",
+        "dark": {
+          "image": "./assets/android_splash_dark.png",
+          "backgroundColor": "#120A0C"
+        }
       },
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive_foreground.png",
-        "backgroundColor": "#F8F7F4",
+        "backgroundColor": "#F5EFE0",
         "monochromeImage": "./assets/android_monochrome.png"
       },
       "package": "com.stthomas.directory"

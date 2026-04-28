@@ -20,21 +20,21 @@ export function FamilyRow({ family: f }: Props) {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={f.photo_url} alt="" className="w-8 h-8 rounded-full object-cover" />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-[#C9A84C]/15 flex items-center justify-center text-xs font-bold text-[#8B6400]">
+            <div className="w-8 h-8 rounded-full bg-[#A83A42]/15 flex items-center justify-center text-xs font-bold text-[#5C1A1F]">
               {f.family_name?.slice(0, 2).toUpperCase()}
             </div>
           )}
           <div>
             <span className="font-medium text-gray-900">{f.family_name}</span>
             {f.hoh_names && (
-              <span className="block text-sm font-medium text-[#8B6400]">{f.hoh_names}</span>
+              <span className="block text-sm font-medium text-[#5C1A1F]">{f.hoh_names}</span>
             )}
           </div>
         </div>
       </td>
       <td className="px-4 py-3 text-gray-500">{f.membership_id}</td>
       <td className="px-4 py-3 text-right">
-        <span className="text-[#8B6400] font-medium">Edit</span>
+        <span className="text-[#5C1A1F] font-medium">Edit</span>
       </td>
     </tr>
   );

@@ -250,7 +250,7 @@ const ProfileScreen = ({ navigation }) => {
             onPress={handleZelle}
           >
             <View style={styles.iconBox}>
-              <Text style={styles.rowIcon}>💙</Text>
+              <Text style={styles.rowIcon}>❤️</Text>
             </View>
             <View style={styles.rowContent}>
               <Text style={styles.rowLabel}>Give via Zelle</Text>

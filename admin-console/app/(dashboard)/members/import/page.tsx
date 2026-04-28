@@ -175,7 +175,7 @@ export default function MemberImportPage() {
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
             onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${dragging ? 'border-[#2B5CE6] bg-blue-50' : 'border-gray-300 hover:border-[#2B5CE6] hover:bg-gray-50'}`}
+            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${dragging ? 'border-[#7E282F] bg-blue-50' : 'border-gray-300 hover:border-[#7E282F] hover:bg-gray-50'}`}
           >
             <div className="text-3xl mb-2">📄</div>
             <p className="text-sm font-medium text-gray-700">
@@ -268,7 +268,7 @@ export default function MemberImportPage() {
             <button
               onClick={handleImport}
               disabled={loading}
-              className="bg-[#2B5CE6] text-white text-sm font-semibold px-6 py-2 rounded-lg hover:bg-[#1E47C8] transition-colors disabled:opacity-60"
+              className="bg-[#7E282F] text-white text-sm font-semibold px-6 py-2 rounded-lg hover:bg-[#6B2228] transition-colors disabled:opacity-60"
             >
               {loading ? 'Importing...' : (() => {
                 const unchangedSet = new Set(preview.unchangedFamilyIds);
@@ -322,7 +322,7 @@ export default function MemberImportPage() {
           <div className="flex gap-3">
             <Link
               href="/members"
-              className="bg-[#2B5CE6] text-white text-sm font-semibold px-6 py-2 rounded-lg hover:bg-[#1E47C8] transition-colors"
+              className="bg-[#7E282F] text-white text-sm font-semibold px-6 py-2 rounded-lg hover:bg-[#6B2228] transition-colors"
             >
               View Members
             </Link>

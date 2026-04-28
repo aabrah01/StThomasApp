@@ -1,14 +1,14 @@
 export const theme = {
   colors: {
     primary: '#FFFFFF',        // white (main surfaces, backgrounds)
-    primaryLight: '#EEF2FF',   // light blue tint for subtle highlights
-    primaryDark: '#CBD5E1',    // cool light gray for placeholders
-    accent: '#C9A84C',         // warm gold (ornate cross)
-    accentLight: '#E8C96A',    // soft gold
-    sapphire: '#2B5CE6',       // royal blue (interactive elements)
-    background: '#F8F7F4',     // off-white with subtle warm tint
+    primaryLight: '#FAF4E8',   // warm parchment tint
+    primaryDark: '#C5BAA8',    // warm greige for placeholders
+    accent: '#7E282F',         // brand burgundy
+    accentLight: '#A83A42',    // lighter burgundy for highlights
+    sapphire: '#7E282F',       // brand burgundy (interactive elements)
+    background: '#F5EFE0',     // warm parchment
     surface: '#FFFFFF',
-    surfaceSecondary: '#F0EFE8', // light warm secondary surface
+    surfaceSecondary: '#EDE5D5', // medium parchment
     text: '#111827',
     textSecondary: '#6B7280',
     textLight: '#9CA3AF',
@@ -52,21 +52,21 @@ export const theme = {
 
   shadows: {
     sm: {
-      shadowColor: '#1A1D2E',
+      shadowColor: '#2A1015',
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.06,
       shadowRadius: 4,
       elevation: 2,
     },
     md: {
-      shadowColor: '#1A1D2E',
+      shadowColor: '#2A1015',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.08,
       shadowRadius: 12,
       elevation: 4,
     },
     lg: {
-      shadowColor: '#1A1D2E',
+      shadowColor: '#2A1015',
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: 0.12,
       shadowRadius: 20,

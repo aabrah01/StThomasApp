@@ -38,9 +38,9 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map(stat => (
           <a key={stat.label} href={stat.href}
-            className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group border-t-4 border-t-[#C9A84C]">
+            className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group border-t-4 border-t-[#A83A42]">
             <div className="text-2xl mb-3">{stat.icon}</div>
-            <div className="text-3xl font-bold text-[#8B6400]">{stat.value}</div>
+            <div className="text-3xl font-bold text-[#5C1A1F]">{stat.value}</div>
             <div className="text-sm text-gray-500 mt-1">{stat.label}</div>
           </a>
         ))}
@@ -49,10 +49,10 @@ export default async function DashboardPage() {
       <div className="mt-8 bg-white rounded-xl p-6 shadow-sm border border-gray-100">
         <h2 className="font-semibold text-gray-900 mb-3">Quick Links</h2>
         <div className="flex flex-wrap gap-3">
-          <a href="/families/new" className="inline-flex items-center gap-2 bg-[#2B5CE6] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#1E47C8] transition-colors">
+          <a href="/families/new" className="inline-flex items-center gap-2 bg-[#7E282F] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#6B2228] transition-colors">
             + Add Family
           </a>
-          <a href="/contributions" className="inline-flex items-center gap-2 bg-[#2B5CE6] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#1E47C8] transition-colors">
+          <a href="/contributions" className="inline-flex items-center gap-2 bg-[#7E282F] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#6B2228] transition-colors">
             Import Contributions
           </a>
         </div>

@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     width: 4,
-    backgroundColor: theme.colors.accent,
+    backgroundColor: '#CC181E',
     alignSelf: 'stretch',
   },
   content: {

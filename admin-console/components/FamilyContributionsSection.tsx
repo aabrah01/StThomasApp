@@ -37,7 +37,7 @@ export default function FamilyContributionsSection({ contributions }: Props) {
               <details key={year} open={year === years[0]}>
                 <summary className="flex items-center justify-between px-6 py-3 cursor-pointer select-none hover:bg-gray-50">
                   <span className="text-sm font-semibold text-gray-700">{year}</span>
-                  <span className="text-sm font-semibold text-[#8B6400]">
+                  <span className="text-sm font-semibold text-[#5C1A1F]">
                     ${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </span>
                 </summary>
@@ -50,7 +50,7 @@ export default function FamilyContributionsSection({ contributions }: Props) {
                     <div className="border-t border-gray-100 text-sm grid grid-cols-[1fr_auto]">
                       {/* Total rollup row */}
                       <div className="px-6 py-2 bg-gray-50 font-semibold text-gray-800 border-b border-gray-50">Total Contributions</div>
-                      <div className="px-6 py-2 bg-gray-50 font-semibold text-[#8B6400] tabular-nums text-right border-b border-gray-50">
+                      <div className="px-6 py-2 bg-gray-50 font-semibold text-[#5C1A1F] tabular-nums text-right border-b border-gray-50">
                         ${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </div>
                       {/* Category rows — indented */}
