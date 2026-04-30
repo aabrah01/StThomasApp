@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import theme from '../../styles/theme';
+import { useTheme } from '../../hooks/useTheme';
 
-const FamilyCard = ({ family, cardWidth, onPress }) => {
+const FamilyCard = React.memo(({ family, cardWidth, onPress }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   const initials = family.familyName
     .trim()
     .split(' ')
@@ -12,7 +15,7 @@ const FamilyCard = ({ family, cardWidth, onPress }) => {
     .toUpperCase();
 
   return (
-    <TouchableOpacity style={[styles.card, { width: cardWidth }]} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity style={[styles.card, { width: cardWidth }]} onPress={() => onPress(family.id)} activeOpacity={0.85}>
       <View style={styles.photoContainer}>
         {family.photoUrl ? (
           <Image source={{ uri: family.photoUrl }} style={styles.photo} />
@@ -34,9 +37,9 @@ const FamilyCard = ({ family, cardWidth, onPress }) => {
       </View>
     </TouchableOpacity>
   );
-};
+});
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.lg,

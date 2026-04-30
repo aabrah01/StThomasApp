@@ -1,7 +1,8 @@
+import { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
-import theme from './theme';
+import { useTheme } from '../hooks/useTheme';
 
-export const commonStyles = StyleSheet.create({
+export const makeCommonStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -148,4 +149,9 @@ export const commonStyles = StyleSheet.create({
   },
 });
 
-export default commonStyles;
+export const useCommonStyles = () => {
+  const theme = useTheme();
+  return useMemo(() => makeCommonStyles(theme), [theme]);
+};
+
+export default useCommonStyles;

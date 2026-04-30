@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,11 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../../styles/theme';
+import { useTheme } from '../../hooks/useTheme';
 
 const EventDetailScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const { event } = route.params;
@@ -129,7 +131,7 @@ const EventDetailScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

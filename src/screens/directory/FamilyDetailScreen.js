@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useWindowDimensions, Platform, StatusBar } from 'react-native';
 import {
   View,
@@ -21,10 +21,13 @@ import MemberList from '../../components/directory/MemberList';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import CropModal from '../../components/common/CropModal';
-import theme from '../../styles/theme';
-import commonStyles from '../../styles/commonStyles';
+import { useTheme } from '../../hooks/useTheme';
+import { useCommonStyles } from '../../styles/commonStyles';
 
 const FamilyDetailScreen = ({ route, navigation }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const commonStyles = useCommonStyles();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === 'android' ? (StatusBar.currentHeight ?? insets.top) : insets.top;
@@ -288,7 +291,7 @@ const FamilyDetailScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   photoWrapper: {
     width: '100%',
     aspectRatio: 1.2,  // overridden inline on tablet

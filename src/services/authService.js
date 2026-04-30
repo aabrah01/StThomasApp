@@ -8,19 +8,62 @@ class AuthService {
     this.demoAuthListeners = [];
   }
 
-  async signIn(email, password) {
+  async requestPin(email) {
     if (DEMO_MODE) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      if (email === DEMO_CREDENTIALS.email && password === DEMO_CREDENTIALS.password) {
+      await new Promise(resolve => setTimeout(resolve, 600));
+      if (email === DEMO_CREDENTIALS.email) {
+        return { error: null };
+      }
+      return { error: 'This email is not registered with our parish. Please visit the church office to be added.' };
+    }
+
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+    try {
+      const res = await fetch(
+        `${supabaseUrl}/functions/v1/request-login-pin`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+          },
+          body: JSON.stringify({ email }),
+        }
+      );
+
+      if (!res.ok) {
+        if (res.status === 404) {
+          return { error: 'This email is not registered with our parish. Please visit the church office to be added.' };
+        }
+        return { error: 'Unable to send sign-in code. Please try again.' };
+      }
+
+      return { error: null };
+    } catch {
+      return { error: 'Network error. Please check your connection.' };
+    }
+  }
+
+  async verifyPin(email, token) {
+    if (DEMO_MODE) {
+      await new Promise(resolve => setTimeout(resolve, 600));
+      if (token === DEMO_CREDENTIALS.pin) {
         this.demoAuthState = demoUser;
         this.notifyDemoAuthListeners(demoUser);
         return { user: demoUser, error: null };
       }
-      return { user: null, error: 'Invalid email or password.' };
+      return { user: null, error: 'Incorrect code. Please check your email and try again.' };
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { user: null, error: this.getErrorMessage(error) };
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email',
+    });
+
+    if (error) return { user: null, error: this.getOtpErrorMessage(error) };
     return { user: data.user, error: null };
   }
 
@@ -33,16 +76,6 @@ class AuthService {
     }
 
     const { error } = await supabase.auth.signOut();
-    return { error: error?.message || null };
-  }
-
-  async resetPassword(email) {
-    if (DEMO_MODE) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return { error: null };
-    }
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
     return { error: error?.message || null };
   }
 
@@ -75,15 +108,19 @@ class AuthService {
     this.demoAuthListeners.forEach(callback => callback(user));
   }
 
-  getErrorMessage(error) {
+  getOtpErrorMessage(error) {
     const msg = (error.message || '').toLowerCase();
-    if (msg.includes('invalid login') || msg.includes('invalid credentials')) {
-      return 'Invalid email or password.';
+    if (msg.includes('token has expired') || msg.includes('otp expired') || msg.includes('expired')) {
+      return 'Your code has expired. Please request a new one.';
     }
-    if (msg.includes('email not confirmed')) return 'Please confirm your email address.';
-    if (msg.includes('too many requests')) return 'Too many failed attempts. Please try again later.';
+    if (msg.includes('invalid') || msg.includes('incorrect') || msg.includes('token')) {
+      return 'Incorrect code. Please check your email and try again.';
+    }
+    if (msg.includes('too many') || msg.includes('rate')) {
+      return 'Too many attempts. Please request a new code.';
+    }
     if (msg.includes('network')) return 'Network error. Please check your connection.';
-    return 'An error occurred. Please try again.';
+    return 'Verification failed. Please try again.';
   }
 }
 

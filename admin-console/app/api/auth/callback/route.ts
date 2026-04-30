@@ -22,7 +22,24 @@ export async function GET(request: NextRequest) {
         },
       }
     );
+
     await supabase.auth.exchangeCodeForSession(code);
+
+    // Verify the signed-in user has admin role before granting access
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!roleData || roleData.role !== 'admin') {
+        // Must await signOut to fully clear the session cookie before redirecting
+        await supabase.auth.signOut();
+        return NextResponse.redirect(`${origin}/login?error=unauthorized`);
+      }
+    }
   }
 
   return NextResponse.redirect(origin);

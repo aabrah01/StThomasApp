@@ -7,49 +7,40 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import * as SplashScreen from 'expo-splash-screen';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../hooks/useTheme';
 
 import LoginScreen from '../screens/auth/LoginScreen';
-import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import PinVerifyScreen from '../screens/auth/PinVerifyScreen';
 import DirectoryListScreen from '../screens/directory/DirectoryListScreen';
 import FamilyDetailScreen from '../screens/directory/FamilyDetailScreen';
 import CalendarScreen from '../screens/calendar/CalendarScreen';
 import EventDetailScreen from '../screens/calendar/EventDetailScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 
-import theme from '../styles/theme';
-
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const TabIcon = ({ name, focused }) => (
-  <Ionicons
-    name={focused ? name : `${name}-outline`}
-    size={24}
-    color={focused ? theme.colors.accent : theme.colors.textLight}
-  />
-);
-
-const HEADER_STYLE = {
-  backgroundColor: theme.colors.surface,
-  shadowColor: 'transparent',
-  elevation: 0,
-  borderBottomWidth: 1,
-  borderBottomColor: theme.colors.border,
-};
-
-const HEADER_TITLE_STYLE = {
-  fontWeight: '700',
-  fontSize: theme.fonts.sizes.lg,
+const TabIcon = ({ name, focused }) => {
+  const theme = useTheme();
+  return (
+    <Ionicons
+      name={focused ? name : `${name}-outline`}
+      size={24}
+      color={focused ? theme.colors.accent : theme.colors.textLight}
+    />
+  );
 };
 
 // All three tabs share this Tab Navigator — no nested stacks, so headers are identical
 const MainTabs = () => {
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const tabBarHeight = 56 + insets.bottom;
 
   return (
     <Tab.Navigator
       screenOptions={{
+        lazy: false,
         tabBarActiveTintColor: theme.colors.accent,
         tabBarInactiveTintColor: theme.colors.textLight,
         tabBarStyle: {
@@ -65,14 +56,23 @@ const MainTabs = () => {
           fontWeight: '600',
           marginTop: 2,
         },
-        headerStyle: HEADER_STYLE,
+        headerStyle: {
+          backgroundColor: theme.colors.surface,
+          shadowColor: 'transparent',
+          elevation: 0,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border,
+        },
         headerTintColor: theme.colors.text,
-        headerTitleStyle: HEADER_TITLE_STYLE,
+        headerTitleStyle: {
+          fontWeight: '700',
+          fontSize: theme.fonts.sizes.lg,
+        },
         headerTitleAlign: 'center',
         headerRight: () => (
           <Image
             source={require('../../assets/icon_transparent.png')}
-            style={{ width: 40, height: 40, marginRight: 12 }}
+            style={{ width: 40, height: 40, marginRight: 12, transform: [{ translateY: -10 }] }}
             resizeMode="contain"
           />
         ),
@@ -112,6 +112,7 @@ const MainTabs = () => {
 // Root stack wraps the tabs so FamilyDetail can slide in over them without
 // any nested navigator affecting the tab header heights
 const AppStack = () => {
+  const theme = useTheme();
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: theme.colors.background } }}>
       <Stack.Screen name="MainTabs" component={MainTabs} />
@@ -122,29 +123,45 @@ const AppStack = () => {
 };
 
 const AuthStack = () => {
+  const theme = useTheme();
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: theme.colors.background } }}>
       <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name="PinVerify" component={PinVerifyScreen} />
     </Stack.Navigator>
   );
 };
 
 const AppNavigator = () => {
   const { user, loading } = useAuth();
+  const theme = useTheme();
 
   useEffect(() => {
-    if (!loading) {
-      SplashScreen.hideAsync();
+    // For the unauthenticated path (login screen) dismiss the splash immediately.
+    // For authenticated users, DataReadyContext dismisses it once all 3 screens have data.
+    if (!loading && !user) {
+      SplashScreen.hideAsync().catch(() => {});
     }
-  }, [loading]);
+  }, [loading, user]);
 
   if (loading) {
     return null;
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      theme={{
+        dark: theme.dark,
+        colors: {
+          primary: theme.colors.accent,
+          background: theme.colors.background,
+          card: theme.colors.surface,
+          text: theme.colors.text,
+          border: theme.colors.border,
+          notification: theme.colors.error,
+        },
+      }}
+    >
       {user ? <AppStack /> : <AuthStack />}
     </NavigationContainer>
   );

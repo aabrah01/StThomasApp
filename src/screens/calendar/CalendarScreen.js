@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useDataReady } from '../../context/DataReadyContext';
+import { useAppRefresh } from '../../hooks/useAppRefresh';
 import {
   View,
   Text,
@@ -17,8 +19,8 @@ import EventCard from '../../components/calendar/EventCard';
 import HomiliesCard from '../../components/calendar/HomiliesCard';
 import VideoPlayerModal from './VideoPlayerModal';
 import ErrorMessage from '../../components/common/ErrorMessage';
-import theme from '../../styles/theme';
-import commonStyles from '../../styles/commonStyles';
+import { useTheme } from '../../hooks/useTheme';
+import { useCommonStyles } from '../../styles/commonStyles';
 
 const todayString = (() => {
   const d = new Date();
@@ -30,6 +32,9 @@ const todayString = (() => {
 const todayMonth = todayString.slice(0, 7) + '-01';
 
 const CalendarScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const commonStyles = useCommonStyles();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const calendarWidth = isTablet ? Math.min(width, 800) : width;
@@ -48,13 +53,25 @@ const CalendarScreen = ({ navigation }) => {
   const [churchName, setChurchName] = useState('');
   const [displayedMonth, setDisplayedMonth] = useState(todayMonth);
   const [calendarResetKey, setCalendarResetKey] = useState(0);
+  const { markScreenReady } = useDataReady();
+  const { refreshKey } = useAppRefresh();
+
   useEffect(() => {
-    initializeCalendar();
-  }, []);
+    if (refreshKey === 0) {
+      initializeCalendar();
+    } else {
+      // Foreground refresh: same as pull-to-refresh
+      loadEvents();
+      loadedYearsRef.current.clear();
+      setVideosMap({});
+      youtubeService.clearCache();
+      loadYoutubeVideos();
+    }
+  }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     markEventDates();
-  }, [events, videosMap, selectedDate]);
+  }, [events, videosMap, selectedDate, theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initializeCalendar = async () => {
     const { data: settings } = await databaseService.getAppSettings();
@@ -95,6 +112,7 @@ const CalendarScreen = ({ navigation }) => {
 
     setLoading(false);
     setRefreshing(false);
+    markScreenReady('calendar');
   };
 
   const loadYoutubeVideos = async (year = new Date().getFullYear()) => {
@@ -212,6 +230,14 @@ const CalendarScreen = ({ navigation }) => {
     return calendarService.getEventsByDate(events, selectedDate);
   };
 
+  const handleEventPress = useCallback((event) => {
+    navigation.navigate('EventDetail', { event });
+  }, [navigation]);
+
+  const renderEventItem = useCallback(({ item }) => (
+    <EventCard event={item} onPress={handleEventPress} />
+  ), [handleEventPress]);
+
   const selectedEvents = getEventsForSelectedDate();
   const selectedVideos = videosMap[selectedDate] || [];
   const totalCount = selectedEvents.length + selectedVideos.length;
@@ -226,7 +252,7 @@ const CalendarScreen = ({ navigation }) => {
     <View style={commonStyles.container}>
       <View style={[styles.inner, isTablet && styles.innerTablet]}>
       <CalendarList
-        key={calendarResetKey}
+        key={`${calendarResetKey}-${theme.dark ? 'd' : 'l'}`}
         current={todayMonth}
         pagingEnabled
         hideArrows
@@ -255,6 +281,8 @@ const CalendarScreen = ({ navigation }) => {
           textDayHeaderFontWeight: '600',
           textDayFontSize: theme.fonts.sizes.md,
           textMonthFontSize: theme.fonts.sizes.lg,
+          dayTextColor: theme.colors.text,
+          textDisabledColor: theme.colors.textLight,
         }}
         calendarStyle={styles.calendar}
         style={styles.calendarList}
@@ -306,12 +334,7 @@ const CalendarScreen = ({ navigation }) => {
               </View>
             ) : null
           }
-          renderItem={({ item }) => (
-            <EventCard
-              event={item}
-              onPress={() => navigation.navigate('EventDetail', { event: item })}
-            />
-          )}
+          renderItem={renderEventItem}
           contentContainerStyle={styles.eventsList}
           refreshControl={
             <RefreshControl
@@ -337,7 +360,7 @@ const CalendarScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   inner: {
     flex: 1,
   },

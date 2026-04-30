@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,35 +10,41 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import ErrorMessage from '../../components/common/ErrorMessage';
-import theme from '../../styles/theme';
-import commonStyles from '../../styles/commonStyles';
+import { useTheme } from '../../hooks/useTheme';
+import { useCommonStyles } from '../../styles/commonStyles';
 
 const LoginScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const commonStyles = useCommonStyles();
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, authError } = useAuth();
-  const passwordRef = useRef(null);
+  const { requestPin, authError } = useAuth();
 
-  const handleLogin = async () => {
+  const handleSendPin = async () => {
     setError('');
 
-    if (!email || !password) {
-      setError('Please enter both email and password.');
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!trimmed.includes('@')) {
+      setError('Please enter a valid email address.');
       return;
     }
 
     setLoading(true);
-    const { error: signInError } = await signIn(email, password);
+    const { error: pinError } = await requestPin(trimmed.toLowerCase());
     setLoading(false);
 
-    if (signInError) {
-      setError(signInError);
+    if (pinError) {
+      setError(pinError);
+    } else {
+      navigation.navigate('PinVerify', { email: trimmed.toLowerCase() });
     }
   };
 
@@ -58,8 +64,8 @@ const LoginScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.welcomeText}>Welcome back</Text>
-          <Text style={styles.welcomeSubtext}>Sign in to your account</Text>
+          <Text style={styles.welcomeText}>Welcome</Text>
+          <Text style={styles.welcomeSubtext}>Enter your email to receive a 6-digit sign-in code</Text>
 
           <View style={styles.inputGroup}>
             <Text style={commonStyles.inputLabel}>Email</Text>
@@ -71,60 +77,22 @@ const LoginScreen = ({ navigation }) => {
               onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
-              returnKeyType="next"
-              onSubmitEditing={() => passwordRef.current?.focus()}
-              blurOnSubmit={false}
+              returnKeyType="go"
+              onSubmitEditing={handleSendPin}
               editable={!loading}
             />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={commonStyles.inputLabel}>Password</Text>
-            <View style={styles.passwordContainer}>
-              <TextInput
-                style={styles.passwordInput}
-                placeholder="Enter your password"
-                placeholderTextColor={theme.colors.textLight}
-                ref={passwordRef}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                returnKeyType="go"
-                onSubmitEditing={handleLogin}
-                editable={!loading}
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword(p => !p)}
-                style={styles.eyeButton}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  color={theme.colors.textLight}
-                />
-              </TouchableOpacity>
-            </View>
           </View>
 
           <ErrorMessage message={error || authError} />
 
           <TouchableOpacity
             style={[styles.loginButton, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
+            onPress={handleSendPin}
             disabled={loading}
           >
             <Text style={styles.loginButtonText}>
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? 'Sending...' : 'Send me a PIN'}
             </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.forgotButton}
-            onPress={() => navigation.navigate('ForgotPassword')}
-            disabled={loading}
-          >
-            <Text style={styles.forgotText}>Forgot Password?</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -132,7 +100,7 @@ const LoginScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -192,23 +160,6 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     marginTop: 4,
   },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surfaceSecondary,
-    borderRadius: theme.borderRadius.md,
-    marginTop: 4,
-  },
-  passwordInput: {
-    flex: 1,
-    paddingVertical: 13,
-    paddingHorizontal: theme.spacing.md,
-    fontSize: theme.fonts.sizes.lg,
-    color: theme.colors.text,
-  },
-  eyeButton: {
-    paddingHorizontal: theme.spacing.md,
-  },
   loginButton: {
     backgroundColor: theme.colors.sapphire,
     paddingVertical: 15,
@@ -225,16 +176,6 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6,
-  },
-  forgotButton: {
-    alignItems: 'center',
-    marginTop: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-  },
-  forgotText: {
-    color: theme.colors.sapphire,
-    fontSize: theme.fonts.sizes.sm,
-    fontWeight: '600',
   },
 });
 

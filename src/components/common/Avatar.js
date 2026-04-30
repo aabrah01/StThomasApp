@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Image, Text, StyleSheet } from 'react-native';
-import theme from '../../styles/theme';
+import { useTheme } from '../../hooks/useTheme';
 
 const Avatar = ({ source, name, size = 60 }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [imageError, setImageError] = useState(false);
 
   const getInitials = (fullName) => {
@@ -37,7 +39,7 @@ const Avatar = ({ source, name, size = 60 }) => {
   return <View style={styles.container}>{renderContent()}</View>;
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',

@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
 import Avatar from '../common/Avatar';
-import theme from '../../styles/theme';
+import { useTheme } from '../../hooks/useTheme';
 
 const MemberList = ({ members }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   if (!members || members.length === 0) {
     return (
       <View style={styles.emptyContainer}>
@@ -64,7 +67,7 @@ const MemberList = ({ members }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {},
   sectionTitle: {
     fontSize: theme.fonts.sizes.lg,

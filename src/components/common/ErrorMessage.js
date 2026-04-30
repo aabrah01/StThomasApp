@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import theme from '../../styles/theme';
+import { useTheme } from '../../hooks/useTheme';
 
 const ErrorMessage = ({ message, style }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   if (!message) return null;
 
   return (
@@ -12,9 +15,9 @@ const ErrorMessage = ({ message, style }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
-    backgroundColor: '#FFEBEE',
+    backgroundColor: theme.colors.errorSurface,
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     borderLeftWidth: 4,

@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, Linking, Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../../styles/theme';
+import { useTheme } from '../../hooks/useTheme';
 
 const ContactInfo = ({ family }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   const handleAddress = () => {
     if (family.address) {
       const { street, city, state, zipCode } = family.address;
@@ -43,7 +46,7 @@ const ContactInfo = ({ family }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {},
   sectionTitle: {
     fontSize: theme.fonts.sizes.lg,

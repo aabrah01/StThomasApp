@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../../styles/theme';
+import { useTheme } from '../../hooks/useTheme';
 
 const VideoPlayerModal = ({ visible, video, churchName, onClose }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { width } = useWindowDimensions();
 
   const onStateChange = useCallback(() => {}, []);
@@ -72,7 +74,7 @@ const VideoPlayerModal = ({ visible, video, churchName, onClose }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

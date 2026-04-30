@@ -1,16 +1,20 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import theme from '../../styles/theme';
+import { useTheme } from '../../hooks/useTheme';
 
-const LoadingSpinner = ({ size = 'large', color = theme.colors.sapphire }) => {
+const LoadingSpinner = ({ size = 'large', color }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const spinnerColor = color ?? theme.colors.sapphire;
+
   return (
     <View style={styles.container}>
-      <ActivityIndicator size={size} color={color} />
+      <ActivityIndicator size={size} color={spinnerColor} />
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',

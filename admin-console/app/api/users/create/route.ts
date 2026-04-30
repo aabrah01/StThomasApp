@@ -1,6 +1,6 @@
 import { createAdminSupabase } from '@/lib/supabase';
 import { requireAdmin, isError } from '@/lib/requireAdmin';
-import { validateEmail, validateRole, validateString, firstError } from '@/lib/validate';
+import { validateEmail, validateString, firstError } from '@/lib/validate';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { NextResponse } from 'next/server';
 
@@ -13,36 +13,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 });
   }
 
-  const { email, password, role } = await request.json();
+  const { email } = await request.json();
 
   const err = firstError(
     validateEmail(email, 'email'),
     validateString(email, 'email', true, 255),
-    validateRole(role),
-    password == null || typeof password !== 'string' || password.length < 8
-      ? 'password must be at least 8 characters'
-      : null,
-    password.length > 72 ? 'password must be 72 characters or less' : null,
   );
   if (err) return NextResponse.json({ error: err }, { status: 400 });
 
   const supabase = createAdminSupabase();
 
-  // Only allow creating accounts for emails that exist in the members table
-  const { data: memberRecord, count } = await supabase
-    .from('members')
-    .select('id, is_head_of_household', { count: 'exact' })
-    .eq('email', email)
-    .limit(1)
-    .single();
-  if (!count || count === 0) {
-    return NextResponse.json({ error: 'This email does not belong to a registered member.' }, { status: 400 });
-  }
-
+  // Create auth user without a password — they will log in via PIN or Google OAuth
   const { data: { user }, error } = await supabase.auth.admin.createUser({
     email,
-    password,
-    email_confirm: true, // skip confirmation email — admin has set the password directly
+    email_confirm: true,
   });
 
   if (error) {
@@ -53,21 +37,24 @@ export async function POST(request: Request) {
   }
 
   if (user) {
+    // Set admin role
+    await supabase.from('user_roles').upsert(
+      { user_id: user.id, role: 'admin' },
+      { onConflict: 'user_id' }
+    );
+
+    // Link to member record if their email matches one (optional — may be a non-member admin)
     const { data: matched } = await supabase
       .from('members')
       .select('id')
       .eq('email', email);
 
-    await Promise.all([
-      supabase.from('user_roles').upsert(
-        { user_id: user.id, role: role || 'member' },
-        { onConflict: 'user_id' }
-      ),
-      supabase.from('member_users').upsert(
-        (matched ?? []).map(m => ({ user_id: user.id, member_id: m.id })),
+    if (matched && matched.length > 0) {
+      await supabase.from('member_users').upsert(
+        matched.map(m => ({ user_id: user.id, member_id: m.id })),
         { onConflict: 'user_id,member_id' }
-      ),
-    ]);
+      );
+    }
   }
 
   await supabase.from('audit_log').insert({
@@ -75,8 +62,8 @@ export async function POST(request: Request) {
     action: 'create',
     table_name: 'user_roles',
     record_id: user?.id ?? null,
-    details: { email, role },
+    details: { email, role: 'admin' },
   });
 
-  return NextResponse.json({ id: user!.id, email: user!.email, role: role || 'member', isHoh: memberRecord?.is_head_of_household ?? false });
+  return NextResponse.json({ id: user!.id, email: user!.email, role: 'admin' });
 }

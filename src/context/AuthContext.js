@@ -52,9 +52,14 @@ export const AuthProvider = ({ children }) => {
     return unsubscribe;
   }, []);
 
-  const signIn = async (email, password) => {
+  const requestPin = async (email) => {
     setAuthError('');
-    const { user, error } = await authService.signIn(email, password);
+    return await authService.requestPin(email);
+  };
+
+  const verifyPin = async (email, token) => {
+    setAuthError('');
+    const { user, error } = await authService.verifyPin(email, token);
     return { user, error };
   };
 
@@ -68,10 +73,6 @@ export const AuthProvider = ({ children }) => {
     return { error };
   };
 
-  const resetPassword = async (email) => {
-    return await authService.resetPassword(email);
-  };
-
   const isAdmin = () => {
     return userRole?.role === 'admin';
   };
@@ -82,9 +83,9 @@ export const AuthProvider = ({ children }) => {
     member,
     loading,
     authError,
-    signIn,
+    requestPin,
+    verifyPin,
     signOut,
-    resetPassword,
     isAdmin,
   };
 

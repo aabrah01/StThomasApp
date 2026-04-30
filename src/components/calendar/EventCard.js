@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../../styles/theme';
+import { useTheme } from '../../hooks/useTheme';
 
-const EventCard = ({ event, onPress }) => {
+const EventCard = React.memo(({ event, onPress }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   const formatTimeParts = (dateString) => {
     const date = new Date(dateString);
     const hours = date.getHours();
@@ -44,9 +47,9 @@ const EventCard = ({ event, onPress }) => {
       <Ionicons name="chevron-forward" size={16} color={theme.colors.textLight} style={styles.chevron} />
     </TouchableOpacity>
   );
-};
+});
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.lg,

@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
+import { useDataReady } from '../../context/DataReadyContext';
+import { useAppRefresh } from '../../hooks/useAppRefresh';
 import {
   View,
   Text,
@@ -15,12 +17,15 @@ import { Ionicons } from '@expo/vector-icons';
 import databaseService from '../../services/databaseService';
 import FamilyCard from '../../components/directory/FamilyCard';
 import ErrorMessage from '../../components/common/ErrorMessage';
-import theme from '../../styles/theme';
-import commonStyles from '../../styles/commonStyles';
+import { useTheme } from '../../hooks/useTheme';
+import { useCommonStyles } from '../../styles/commonStyles';
 
-const CARD_MARGIN = theme.spacing.sm;
+const CARD_MARGIN = 8;
 
 const DirectoryListScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const commonStyles = useCommonStyles();
   const { width } = useWindowDimensions();
   const numColumns = width >= 1024 ? 4 : width >= 768 ? 3 : 2;
   const cardWidth = (width - theme.spacing.md * 2 - CARD_MARGIN * (numColumns - 1)) / numColumns;
@@ -30,12 +35,18 @@ const DirectoryListScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const { markScreenReady } = useDataReady();
+  const { refreshKey } = useAppRefresh();
 
   useFocusEffect(
     useCallback(() => {
       loadFamilies();
     }, [])
   );
+
+  useEffect(() => {
+    if (refreshKey > 0) loadFamilies();
+  }, [refreshKey]);
 
   useEffect(() => {
     filterFamilies();
@@ -54,6 +65,7 @@ const DirectoryListScreen = ({ navigation }) => {
     }
     setLoading(false);
     setRefreshing(false);
+    markScreenReady('directory');
   };
 
   const filterFamilies = () => {
@@ -81,6 +93,15 @@ const DirectoryListScreen = ({ navigation }) => {
     setRefreshing(true);
     loadFamilies();
   };
+
+  const handleCardPress = useCallback((id) => {
+    Keyboard.dismiss();
+    navigation.navigate('FamilyDetail', { familyId: id });
+  }, [navigation]);
+
+  const renderItem = useCallback(({ item }) => (
+    <FamilyCard family={item} cardWidth={cardWidth} onPress={handleCardPress} />
+  ), [cardWidth, handleCardPress]);
 
   return (
     <View style={commonStyles.container}>
@@ -123,13 +144,7 @@ const DirectoryListScreen = ({ navigation }) => {
           keyExtractor={(item) => item.id}
           key={numColumns}
           numColumns={numColumns}
-          renderItem={({ item }) => (
-            <FamilyCard
-              family={item}
-              cardWidth={cardWidth}
-              onPress={() => { Keyboard.dismiss(); navigation.navigate('FamilyDetail', { familyId: item.id }); }}
-            />
-          )}
+          renderItem={renderItem}
           contentContainerStyle={styles.grid}
           columnWrapperStyle={styles.row}
           onScrollBeginDrag={Keyboard.dismiss}
@@ -147,7 +162,7 @@ const DirectoryListScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',

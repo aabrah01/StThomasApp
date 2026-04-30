@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
+import { useDataReady } from '../../context/DataReadyContext';
+import { useAppRefresh } from '../../hooks/useAppRefresh';
 import {
   View,
   Text,
@@ -18,12 +20,15 @@ import databaseService from '../../services/databaseService';
 import storageService from '../../services/storageService';
 import Avatar from '../../components/common/Avatar';
 import CropModal from '../../components/common/CropModal';
-import theme from '../../styles/theme';
-import commonStyles from '../../styles/commonStyles';
+import { useTheme } from '../../hooks/useTheme';
+import { useCommonStyles } from '../../styles/commonStyles';
 import * as Application from 'expo-application';
 import * as Clipboard from 'expo-clipboard';
 
 const ProfileScreen = ({ navigation }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const commonStyles = useCommonStyles();
   const { user, member, userRole, signOut, isAdmin } = useAuth();
   const [family, setFamily] = useState(null);
   const [contributions, setContributions] = useState([]);
@@ -34,12 +39,23 @@ const ProfileScreen = ({ navigation }) => {
 
   const [givingYear, setGivingYear] = useState(new Date().getFullYear());
   const [asofLabel, setAsofLabel] = useState('');
+  const { markScreenReady } = useDataReady();
+  const { refreshKey } = useAppRefresh();
+
+  // Load on mount so data is ready even before Profile tab is first visited
+  useEffect(() => {
+    if (member) loadFamilyData();
+  }, [member]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFocusEffect(
     useCallback(() => {
       loadFamilyData();
     }, [member])
   );
+
+  useEffect(() => {
+    if (refreshKey > 0) loadFamilyData();
+  }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadFamilyData = async () => {
     const settingsResult = await databaseService.getContributionSettings();
@@ -62,6 +78,7 @@ const ProfileScreen = ({ navigation }) => {
     if (familyResult?.data) setFamily(familyResult.data);
     if (contribResult?.data) setContributions(contribResult.data);
     setLoading(false);
+    markScreenReady('profile');
   };
 
   const handleUploadFamilyPhoto = () => {
@@ -342,7 +359,7 @@ const ProfileScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   header: {
     backgroundColor: theme.colors.sapphire,
     alignItems: 'center',

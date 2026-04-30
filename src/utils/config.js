@@ -10,5 +10,5 @@ export const DEMO_MODE = false;
 // They are never sent to Supabase when DEMO_MODE is true.
 export const DEMO_CREDENTIALS = {
   email: 'demo@example.com',
-  password: 'demo123',
+  pin: '123456', // demo PIN — only works in DEMO_MODE
 };
