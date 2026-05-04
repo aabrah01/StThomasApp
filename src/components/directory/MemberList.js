@@ -1,11 +1,17 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, Alert, StyleSheet } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import Avatar from '../common/Avatar';
 import { useTheme } from '../../hooks/useTheme';
 
 const MemberList = ({ members }) => {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+
+  const copyToClipboard = async (text, label) => {
+    await Clipboard.setStringAsync(text);
+    Alert.alert('Copied', `${label} copied to clipboard`);
+  };
 
   if (!members || members.length === 0) {
     return (
@@ -27,9 +33,14 @@ const MemberList = ({ members }) => {
               size={52}
             />
             <View style={styles.memberInfo}>
-              <Text style={styles.memberName}>
-                {member.firstName} {member.lastName}
-              </Text>
+              <TouchableOpacity
+                onLongPress={() => copyToClipboard(`${member.firstName} ${member.lastName}`, 'Name')}
+                delayLongPress={400}
+              >
+                <Text style={styles.memberName}>
+                  {member.firstName} {member.lastName}
+                </Text>
+              </TouchableOpacity>
               {member.alias ? (
                 <Text style={styles.memberNickname}>"{member.alias}"</Text>
               ) : null}
@@ -41,6 +52,8 @@ const MemberList = ({ members }) => {
               {member.email ? (
                 <TouchableOpacity
                   onPress={() => Linking.openURL(`mailto:${member.email}`)}
+                  onLongPress={() => copyToClipboard(member.email, 'Email')}
+                  delayLongPress={400}
                   style={styles.contactRow}
                 >
                   <Text style={[styles.memberContact, styles.emailLink]}>
@@ -51,6 +64,8 @@ const MemberList = ({ members }) => {
               {member.phoneNumber ? (
                 <TouchableOpacity
                   onPress={() => Linking.openURL(`tel:${member.phoneNumber}`)}
+                  onLongPress={() => copyToClipboard(member.phoneNumber, 'Phone number')}
+                  delayLongPress={400}
                   style={styles.contactRow}
                 >
                   <Text style={[styles.memberContact, styles.phoneLink]}>

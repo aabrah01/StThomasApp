@@ -225,10 +225,10 @@ export default function ContributionsClient({ contributions: initial, families }
       {/* Import panel */}
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">Import from QuickBooks</h2>
+            <h2 className="font-semibold text-gray-900">Import Contributions</h2>
           </div>
           <p className="text-sm text-gray-500">
-            Supports QuickBooks CSV (transaction rows) and Excel summary exports (one row per family, categories as columns).
+            Supports Excel (.xlsx) summary exports (one row per family, categories as columns).
           </p>
           <div className="flex items-center gap-3">
             <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Contribution Date</label>
@@ -236,7 +236,7 @@ export default function ContributionsClient({ contributions: initial, families }
               className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7E282F]" />
             <span className="text-xs text-gray-400">Used for Excel imports (no date in file)</span>
           </div>
-          <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileParse}
+          <input type="file" accept=".xlsx" onChange={handleFileParse}
             className="text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#7E282F] file:text-white hover:file:bg-[#6B2228]" />
 
           {parseError && <p className="text-sm text-red-600">{parseError}</p>}

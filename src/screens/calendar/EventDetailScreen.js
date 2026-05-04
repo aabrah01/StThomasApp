@@ -18,7 +18,8 @@ const EventDetailScreen = ({ route, navigation }) => {
   const { event } = route.params;
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
+    const normalized = dateString?.includes('T') ? dateString : `${dateString}T00:00:00`;
+    const date = new Date(normalized);
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',

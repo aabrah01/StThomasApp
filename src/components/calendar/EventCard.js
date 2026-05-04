@@ -22,7 +22,7 @@ const EventCard = React.memo(({ event, onPress }) => {
     : formatTimeParts(event.startDate);
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.75}>
+    <TouchableOpacity style={styles.card} onPress={() => onPress(event)} activeOpacity={0.75}>
       <View style={styles.timeColumn}>
         <Text style={styles.time}>{time}</Text>
         <Text style={styles.ampm}>{ampm}</Text>

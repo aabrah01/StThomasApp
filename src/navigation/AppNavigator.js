@@ -82,7 +82,7 @@ const MainTabs = () => {
         name="Directory"
         component={DirectoryListScreen}
         options={{
-          title: 'Parish Directory',
+          title: 'St. Thomas LI Directory',
           tabBarLabel: 'Directory',
           tabBarIcon: ({ focused }) => <TabIcon name="people" focused={focused} />,
         }}
@@ -91,7 +91,7 @@ const MainTabs = () => {
         name="Calendar"
         component={CalendarScreen}
         options={{
-          title: 'Parish Events',
+          title: 'St. Thomas LI Events',
           tabBarLabel: 'Calendar',
           tabBarIcon: ({ focused }) => <TabIcon name="calendar" focused={focused} />,
         }}

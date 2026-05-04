@@ -29,11 +29,11 @@
     "android": {
       "icon": "./assets/android_legacy_icon.png",
       "splash": {
-        "image": "./assets/android_splash.png",
+        "image": "./assets/splash.png",
         "resizeMode": "contain",
         "backgroundColor": "#F5EFE0",
         "dark": {
-          "image": "./assets/android_splash_dark.png",
+          "image": "./assets/splash_dark.png",
           "backgroundColor": "#120A0C"
         }
       },

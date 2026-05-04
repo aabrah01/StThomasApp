@@ -1,11 +1,17 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, Linking, Platform, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, Platform, Alert, StyleSheet } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
 
 const ContactInfo = ({ family }) => {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+
+  const copyToClipboard = async (text, label) => {
+    await Clipboard.setStringAsync(text);
+    Alert.alert('Copied', `${label} copied to clipboard`);
+  };
 
   const handleAddress = () => {
     if (family.address) {
@@ -25,7 +31,17 @@ const ContactInfo = ({ family }) => {
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Address</Text>
 
-      <TouchableOpacity style={styles.infoRow} onPress={handleAddress} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={styles.infoRow}
+        onPress={handleAddress}
+        onLongPress={() => {
+          const { street, street2, city, state, zipCode } = family.address;
+          const parts = [street, street2, [city, state].filter(Boolean).join(', ') + (zipCode ? ` ${zipCode}` : '')].filter(Boolean);
+          copyToClipboard(parts.join(', '), 'Address');
+        }}
+        delayLongPress={400}
+        activeOpacity={0.7}
+      >
         <View style={styles.iconWrap}>
           <Ionicons name="location-outline" size={20} color={theme.colors.sapphire} />
         </View>

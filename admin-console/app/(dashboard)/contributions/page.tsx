@@ -34,7 +34,7 @@ export default async function ContributionsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Contributions</h1>
-          <p className="text-gray-500 text-sm">Import from QuickBooks CSV or add manually</p>
+          <p className="text-gray-500 text-sm">Import from Excel (.xlsx) or add manually</p>
         </div>
       </div>
       <ContributionsClient contributions={contribs} families={familyOptions} />
