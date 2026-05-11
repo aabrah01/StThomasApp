@@ -35,6 +35,15 @@ export interface Contribution {
   fiscalYear: number;
 }
 
+export interface MealSignup {
+  id: string;
+  eventDate: string;
+  memberId: string;
+  memberName: string;
+  familyName: string;
+  createdAt: string;
+}
+
 export interface UserRole {
   id: string;
   userId: string;

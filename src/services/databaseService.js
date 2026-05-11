@@ -18,6 +18,9 @@ import {
 // In-memory photo overrides for demo mode
 const demoPhotoOverrides = {};
 
+// In-memory meal signup store for demo mode
+const demoMealSignups = [];
+
 // ── Row mappers ───────────────────────────────────────────────────────────────
 
 const mapFamily = (row) => ({
@@ -281,6 +284,94 @@ class DatabaseService {
 
     if (error || !data) return null;
     return { asofDate: data.asof_date };
+  }
+
+  async getMealSignupCount(eventDate) {
+    if (DEMO_MODE) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return { data: demoMealSignups.filter(s => s.eventDate === eventDate).length, error: null };
+    }
+    const { data, error } = await supabase.rpc('meal_signup_count', { p_date: eventDate });
+    if (error) return { data: 0, error: error.message };
+    return { data: Number(data), error: null };
+  }
+
+  async getMealSignups(eventDate) {
+    if (DEMO_MODE) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const signups = demoMealSignups
+        .filter(s => s.eventDate === eventDate)
+        .map(s => {
+          const m = demoMembers.find(dm => dm.id === s.memberId);
+          return {
+            id: s.id,
+            memberId: s.memberId,
+            createdAt: s.createdAt,
+            member: m ? { firstName: m.firstName, lastName: m.lastName, familyId: m.familyId } : null,
+          };
+        });
+      return { data: signups, error: null };
+    }
+    const { data, error } = await supabase
+      .from('meal_signups')
+      .select('id, member_id, created_at, member:members(first_name, last_name, family_id)')
+      .eq('event_date', eventDate);
+    if (error) return { data: null, error: error.message };
+    return {
+      data: (data ?? []).map(row => ({
+        id: row.id,
+        memberId: row.member_id,
+        createdAt: row.created_at,
+        member: row.member
+          ? { firstName: row.member.first_name, lastName: row.member.last_name, familyId: row.member.family_id }
+          : null,
+      })),
+      error: null,
+    };
+  }
+
+  async createMealSignup(memberId, eventDate) {
+    if (DEMO_MODE) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const existing = demoMealSignups.find(s => s.memberId === memberId && s.eventDate === eventDate);
+      if (existing) return { data: existing, error: null };
+      const signup = { id: `demo-signup-${Date.now()}`, memberId, eventDate, createdAt: new Date().toISOString() };
+      demoMealSignups.push(signup);
+      return { data: signup, error: null };
+    }
+    const { data, error } = await supabase
+      .from('meal_signups')
+      .insert({ member_id: memberId, event_date: eventDate })
+      .select('id')
+      .single();
+    if (error) return { data: null, error: error.message };
+    return { data: { id: data.id }, error: null };
+  }
+
+  async deleteMealSignup(signupId) {
+    if (DEMO_MODE) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const idx = demoMealSignups.findIndex(s => s.id === signupId);
+      if (idx !== -1) demoMealSignups.splice(idx, 1);
+      return { error: null };
+    }
+    const { error } = await supabase.from('meal_signups').delete().eq('id', signupId);
+    return { error: error?.message ?? null };
+  }
+
+  async getMealSignupDates(fromDate, toDate) {
+    if (DEMO_MODE) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const dates = [...new Set(
+        demoMealSignups
+          .filter(s => s.eventDate >= fromDate && s.eventDate <= toDate)
+          .map(s => s.eventDate)
+      )];
+      return { data: dates, error: null };
+    }
+    const { data, error } = await supabase.rpc('meal_signup_dates_in_range', { p_from: fromDate, p_to: toDate });
+    if (error) return { data: null, error: error.message };
+    return { data: (data ?? []).map(row => row.event_date), error: null };
   }
 
   async getAppSettings() {

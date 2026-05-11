@@ -16,6 +16,7 @@ import calendarService from '../../services/calendarService';
 import youtubeService from '../../services/youtubeService';
 import databaseService from '../../services/databaseService';
 import EventCard from '../../components/calendar/EventCard';
+import FoodDonationCard from '../../components/calendar/FoodDonationCard';
 import HomiliesCard from '../../components/calendar/HomiliesCard';
 import VideoPlayerModal from './VideoPlayerModal';
 import ErrorMessage from '../../components/common/ErrorMessage';
@@ -51,6 +52,8 @@ const CalendarScreen = ({ navigation }) => {
   const [modalVideo, setModalVideo] = useState(null);
   const [videoModalVisible, setVideoModalVisible] = useState(false);
   const [churchName, setChurchName] = useState('');
+  const [signupDates, setSignupDates] = useState(new Set());
+  const signupRangeRef = useRef({ min: null, max: null });
   const [displayedMonth, setDisplayedMonth] = useState(todayMonth);
   const [calendarResetKey, setCalendarResetKey] = useState(0);
   const { markScreenReady } = useDataReady();
@@ -71,7 +74,7 @@ const CalendarScreen = ({ navigation }) => {
 
   useEffect(() => {
     markEventDates();
-  }, [events, videosMap, selectedDate, theme]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [events, videosMap, selectedDate, theme, signupDates]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initializeCalendar = async () => {
     const { data: settings } = await databaseService.getAppSettings();
@@ -108,11 +111,23 @@ const CalendarScreen = ({ navigation }) => {
     } else if (data) {
       setEvents(data);
       loadedRangeRef.current = { min: timeMin, max: timeMax };
+      loadMealSignupDates(
+        timeMin.toISOString().split('T')[0],
+        timeMax.toISOString().split('T')[0],
+      );
     }
 
     setLoading(false);
     setRefreshing(false);
     markScreenReady('calendar');
+  };
+
+  const loadMealSignupDates = async (fromDate, toDate) => {
+    const { data } = await databaseService.getMealSignupDates(fromDate, toDate);
+    if (data) {
+      setSignupDates(new Set(data));
+      signupRangeRef.current = { min: fromDate, max: toDate };
+    }
   };
 
   const loadYoutubeVideos = async (year = new Date().getFullYear()) => {
@@ -178,6 +193,17 @@ const CalendarScreen = ({ navigation }) => {
       }
     });
 
+    signupDates.forEach((date) => {
+      const existing = marked[date]?.dots || [];
+      const alreadyHasFood = existing.some(d => d.key === 'food');
+      if (!alreadyHasFood) {
+        marked[date] = {
+          ...marked[date],
+          dots: [...existing, { key: 'food', color: '#4CAF50', selectedDotColor: '#FFFFFF' }],
+        };
+      }
+    });
+
     marked[selectedDate] = {
       ...marked[selectedDate],
       selected: true,
@@ -234,12 +260,18 @@ const CalendarScreen = ({ navigation }) => {
     navigation.navigate('EventDetail', { event });
   }, [navigation]);
 
+  const handleSignupChange = useCallback(() => {
+    const { min, max } = signupRangeRef.current;
+    if (min && max) loadMealSignupDates(min, max);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const renderEventItem = useCallback(({ item }) => (
     <EventCard event={item} onPress={handleEventPress} />
   ), [handleEventPress]);
 
   const selectedEvents = getEventsForSelectedDate();
   const selectedVideos = videosMap[selectedDate] || [];
+  const showFoodCard = selectedEvents.some(e => !e.isAllDay);
   const totalCount = selectedEvents.length + selectedVideos.length;
   // Append T00:00:00 so the string is parsed as local time, not UTC midnight
   const formattedDate = new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-US', {
@@ -311,8 +343,14 @@ const CalendarScreen = ({ navigation }) => {
           data={selectedEvents}
           keyExtractor={(item) => item.id}
           ListHeaderComponent={
-            selectedVideos.length > 0 ? (
+            (showFoodCard || selectedVideos.length > 0) ? (
               <>
+                {showFoodCard && (
+                  <FoodDonationCard
+                    eventDate={selectedDate}
+                    onSignupChange={handleSignupChange}
+                  />
+                )}
                 {selectedVideos.map((video) => (
                   <HomiliesCard
                     key={video.videoId}
@@ -327,7 +365,7 @@ const CalendarScreen = ({ navigation }) => {
             ) : null
           }
           ListEmptyComponent={
-            selectedVideos.length === 0 ? (
+            selectedVideos.length === 0 && !showFoodCard ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyIcon}>📭</Text>
                 <Text style={styles.emptyText}>No events on this day</Text>

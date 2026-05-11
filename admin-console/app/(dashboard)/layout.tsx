@@ -12,6 +12,7 @@ const navItems = [
   { href: '/families',       label: 'Families',        icon: '🏠' },
   { href: '/members',        label: 'Members',         icon: '👤' },
   { href: '/contributions',  label: 'Contributions',   icon: '💰' },
+  { href: '/meal-signups',   label: 'Meal Signups',    icon: '🍽️' },
   { href: '/users',          label: 'Users & Roles',   icon: '🔑' },
 ];
 
