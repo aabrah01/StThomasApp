@@ -8,6 +8,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [member, setMember] = useState(null);
+  const [appSettings, setAppSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState('');
 
@@ -38,13 +39,16 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
+        const { data: settingsData } = await databaseService.getAppSettings();
         setUser(authUser);
         setUserRole(roleData);
         setMember(memberData);
+        setAppSettings(settingsData);
       } else {
         setUser(null);
         setUserRole(null);
         setMember(null);
+        setAppSettings(null);
       }
       setLoading(false);
     });
@@ -69,6 +73,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setUserRole(null);
       setMember(null);
+      setAppSettings(null);
     }
     return { error };
   };
@@ -81,6 +86,7 @@ export const AuthProvider = ({ children }) => {
     user,
     userRole,
     member,
+    appSettings,
     loading,
     authError,
     requestPin,

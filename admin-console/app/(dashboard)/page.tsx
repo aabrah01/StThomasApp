@@ -1,5 +1,6 @@
 import { createAdminSupabase } from '@/lib/supabase';
 import { DEMO_FAMILIES, DEMO_MEMBERS, DEMO_CONTRIBUTIONS } from '@/lib/demoData';
+import FeaturesSection from './FeaturesSection';
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
@@ -7,6 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
   let familyCount: number, memberCount: number, contribCount: number;
+  let enableMealSignup = false;
 
   if (DEMO_MODE) {
     familyCount = DEMO_FAMILIES.length;
@@ -14,14 +16,16 @@ export default async function DashboardPage() {
     contribCount = DEMO_CONTRIBUTIONS.length;
   } else {
     const supabase = createAdminSupabase();
-    const [fc, mc, cc] = await Promise.all([
+    const [fc, mc, cc, settings] = await Promise.all([
       supabase.from('families').select('*', { count: 'exact', head: true }),
       supabase.from('members').select('*', { count: 'exact', head: true }),
       supabase.from('contributions').select('*', { count: 'exact', head: true }),
+      supabase.from('app_settings').select('enable_meal_signup').eq('id', 'config').single(),
     ]);
     familyCount = fc.count ?? 0;
     memberCount = mc.count ?? 0;
     contribCount = cc.count ?? 0;
+    enableMealSignup = settings.data?.enable_meal_signup ?? false;
   }
 
   const stats = [
@@ -57,6 +61,8 @@ export default async function DashboardPage() {
           </a>
         </div>
       </div>
+
+      <FeaturesSection initialEnableMealSignup={enableMealSignup} />
     </div>
   );
 }

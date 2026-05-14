@@ -60,6 +60,7 @@ const mapAppSettings = (row) => ({
   churchName: row.church_name,
   churchAddress: row.church_address,
   contactEmail: row.contact_email,
+  enableMealSignup: row.enable_meal_signup ?? false,
 });
 
 const mapContribution = (row) => ({

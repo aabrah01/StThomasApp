@@ -5,7 +5,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../context/AuthContext';
 import databaseService from '../../services/databaseService';
 
-const FOOD_GREEN = '#4CAF50';
 
 const FoodDonationCard = React.memo(({ eventDate, onSignupChange }) => {
   const theme = useTheme();
@@ -39,6 +38,8 @@ const FoodDonationCard = React.memo(({ eventDate, onSignupChange }) => {
     setCount(0);
     load();
   }, [load]);
+
+  const isPast = eventDate < new Date().toISOString().split('T')[0];
 
   const ownSignup = signups.find(s => s.memberId === member?.id);
   const familySignups = signups.filter(
@@ -81,7 +82,7 @@ const FoodDonationCard = React.memo(({ eventDate, onSignupChange }) => {
       </View>
 
       {loading ? (
-        <ActivityIndicator size="small" color={FOOD_GREEN} style={styles.loader} />
+        <ActivityIndicator size="small" color={theme.colors.sapphire} style={styles.loader} />
       ) : (
         <View style={styles.body}>
           {error ? (
@@ -115,20 +116,22 @@ const FoodDonationCard = React.memo(({ eventDate, onSignupChange }) => {
               {ownSignup ? (
                 <View style={styles.ownRow}>
                   <Text style={styles.ownText}>You have pledged to bring food</Text>
-                  <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={handleRemove}
-                    disabled={actionLoading}
-                    activeOpacity={0.75}
-                  >
-                    {actionLoading ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.removeButtonText}>Remove</Text>
-                    )}
-                  </TouchableOpacity>
+                  {!isPast && (
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={handleRemove}
+                      disabled={actionLoading}
+                      activeOpacity={0.75}
+                    >
+                      {actionLoading ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.removeButtonText}>Remove</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
                 </View>
-              ) : (
+              ) : !isPast ? (
                 <TouchableOpacity
                   style={[styles.pledgeButton, actionLoading && styles.pledgeButtonDisabled]}
                   onPress={handlePledge}
@@ -140,11 +143,11 @@ const FoodDonationCard = React.memo(({ eventDate, onSignupChange }) => {
                   ) : (
                     <>
                       <Ionicons name="add-circle-outline" size={16} color="#FFFFFF" style={styles.pledgeIcon} />
-                      <Text style={styles.pledgeButtonText}>Pledge to Bring Food</Text>
+                      <Text style={styles.pledgeButtonText}>Pledge to Donate</Text>
                     </>
                   )}
                 </TouchableOpacity>
-              )}
+              ) : null}
             </>
           )}
         </View>
@@ -164,7 +167,7 @@ const makeStyles = (theme) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: FOOD_GREEN,
+    backgroundColor: theme.colors.sapphire,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
   },
@@ -215,7 +218,7 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   ownText: {
     fontSize: theme.fonts.sizes.sm,
-    color: FOOD_GREEN,
+    color: theme.colors.sapphire,
     fontWeight: '600',
     flex: 1,
     marginRight: theme.spacing.sm,
@@ -234,7 +237,7 @@ const makeStyles = (theme) => StyleSheet.create({
     fontWeight: '700',
   },
   pledgeButton: {
-    backgroundColor: FOOD_GREEN,
+    backgroundColor: theme.colors.sapphire,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

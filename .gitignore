@@ -32,6 +32,10 @@ yarn-error.*
 .env.local
 .env*
 
+# Dev setup guide (contains connection strings — do not commit)
+DEV_SETUP.md
+prod_data.sql
+
 
 # IDE
 .vscode/

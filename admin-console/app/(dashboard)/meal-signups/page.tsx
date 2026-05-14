@@ -15,7 +15,7 @@ function groupByDate(signups: Row[]): { date: string; rows: Row[] }[] {
     map.set(s.eventDate, [...existing, s]);
   }
   return Array.from(map.entries())
-    .sort(([a], [b]) => b.localeCompare(a))
+    .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, rows]) => ({ date, rows }));
 }
 
@@ -46,7 +46,7 @@ export default function MealSignupsPage() {
     const { data, error: fetchError } = await supabase
       .from('meal_signups')
       .select('id, event_date, created_at, member:members(id, first_name, last_name, family:families(family_name))')
-      .order('event_date', { ascending: false });
+      .order('event_date', { ascending: true });
 
     if (fetchError) {
       setError('Failed to load meal signups');

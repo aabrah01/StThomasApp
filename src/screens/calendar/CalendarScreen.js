@@ -36,6 +36,7 @@ const CalendarScreen = ({ navigation }) => {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const commonStyles = useCommonStyles();
+  const [mealSignupEnabled, setMealSignupEnabled] = useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const calendarWidth = isTablet ? Math.min(width, 800) : width;
@@ -74,12 +75,13 @@ const CalendarScreen = ({ navigation }) => {
 
   useEffect(() => {
     markEventDates();
-  }, [events, videosMap, selectedDate, theme, signupDates]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [events, videosMap, selectedDate, theme, signupDates, mealSignupEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initializeCalendar = async () => {
     const { data: settings } = await databaseService.getAppSettings();
 
     if (settings?.churchName) setChurchName(settings.churchName);
+    setMealSignupEnabled(settings?.enableMealSignup ?? false);
 
     if (settings?.googleCalendarId && settings?.googleApiKey) {
       calendarService.setConfig(settings.googleCalendarId, settings.googleApiKey);
@@ -111,10 +113,13 @@ const CalendarScreen = ({ navigation }) => {
     } else if (data) {
       setEvents(data);
       loadedRangeRef.current = { min: timeMin, max: timeMax };
-      loadMealSignupDates(
-        timeMin.toISOString().split('T')[0],
-        timeMax.toISOString().split('T')[0],
-      );
+      if (mealSignupEnabled) {
+        loadMealSignupDates(
+          timeMin.toISOString().split('T')[0],
+          timeMax.toISOString().split('T')[0],
+          true,
+        );
+      }
     }
 
     setLoading(false);
@@ -122,10 +127,10 @@ const CalendarScreen = ({ navigation }) => {
     markScreenReady('calendar');
   };
 
-  const loadMealSignupDates = async (fromDate, toDate) => {
+  const loadMealSignupDates = async (fromDate, toDate, replace = false) => {
     const { data } = await databaseService.getMealSignupDates(fromDate, toDate);
     if (data) {
-      setSignupDates(new Set(data));
+      setSignupDates(prev => replace ? new Set(data) : new Set([...prev, ...data]));
       signupRangeRef.current = { min: fromDate, max: toDate };
     }
   };
@@ -143,13 +148,18 @@ const CalendarScreen = ({ navigation }) => {
     setDisplayedMonth(`${month.year}-${String(month.month).padStart(2, '0')}-01`);
     loadYoutubeVideos(month.year);
 
+    const monthStart = new Date(month.year, month.month - 1, 1);
+    const monthEnd = new Date(month.year, month.month, 0, 23, 59, 59);
+    const monthStartStr = monthStart.toISOString().split('T')[0];
+    const monthEndStr = monthEnd.toISOString().split('T')[0];
+
+    // Always fetch fresh signup dates for the new month (merge into existing set)
+    if (mealSignupEnabled) loadMealSignupDates(monthStartStr, monthEndStr);
+
     const { min, max } = loadedRangeRef.current;
     if (!min || !max) return;
 
     // First and last moment of the navigated month
-    const monthStart = new Date(month.year, month.month - 1, 1);
-    const monthEnd = new Date(month.year, month.month, 0, 23, 59, 59);
-
     if (monthEnd < min || monthStart > max) {
       setMonthLoading(true);
       const { data } = await calendarService.getEvents(
@@ -193,13 +203,14 @@ const CalendarScreen = ({ navigation }) => {
       }
     });
 
-    signupDates.forEach((date) => {
+    if (mealSignupEnabled) signupDates.forEach((date) => {
+      if (date < todayString) return;
       const existing = marked[date]?.dots || [];
       const alreadyHasFood = existing.some(d => d.key === 'food');
       if (!alreadyHasFood) {
         marked[date] = {
           ...marked[date],
-          dots: [...existing, { key: 'food', color: '#4CAF50', selectedDotColor: '#FFFFFF' }],
+          dots: [...existing, { key: 'food', color: '#FF9800', selectedDotColor: '#FFFFFF' }],
         };
       }
     });
@@ -245,6 +256,8 @@ const CalendarScreen = ({ navigation }) => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    const { data: settings } = await databaseService.getAppSettings();
+    setMealSignupEnabled(settings?.enableMealSignup ?? false);
     loadEvents();
     loadedYearsRef.current.clear();
     setVideosMap({});
@@ -271,7 +284,7 @@ const CalendarScreen = ({ navigation }) => {
 
   const selectedEvents = getEventsForSelectedDate();
   const selectedVideos = videosMap[selectedDate] || [];
-  const showFoodCard = selectedEvents.some(e => !e.isAllDay);
+  const showFoodCard = mealSignupEnabled && selectedEvents.some(e => !e.isAllDay);
   const totalCount = selectedEvents.length + selectedVideos.length;
   // Append T00:00:00 so the string is parsed as local time, not UTC midnight
   const formattedDate = new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-US', {

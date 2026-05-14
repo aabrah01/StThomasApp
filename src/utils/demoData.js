@@ -486,6 +486,7 @@ export const demoAppSettings = {
   churchName: 'St. Thomas Church',
   churchAddress: '100 Church Street, Springfield, IL 62701',
   contactEmail: 'info@stthomas.org',
+  enableMealSignup: true,
 };
 
 // Keyed by YYYY-MM-DD — each entry is a public YouTube video for that Sunday's homily
