@@ -1,5 +1,5 @@
 import { supabase } from '../../supabase.config';
-import { DEMO_MODE } from '../utils/config';
+import { isDemoSession } from '../utils/config';
 
 // Supabase Storage bucket — create in Dashboard → Storage → New Bucket
 // Name: "family-photos"
@@ -16,7 +16,7 @@ const BUCKET = 'family-photos';
 
 class StorageService {
   async uploadFamilyPhoto(familyId, localUri) {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       return { url: localUri, error: null };
     }
 
@@ -40,7 +40,7 @@ class StorageService {
   }
 
   async deleteFamilyPhoto(url) {
-    if (DEMO_MODE || !url) return;
+    if (isDemoSession() || !url) return;
     try {
       const marker = `/${BUCKET}/`;
       const idx = url.indexOf(marker);

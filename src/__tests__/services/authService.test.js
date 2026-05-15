@@ -7,6 +7,10 @@
 jest.mock('../../utils/config', () => ({
   DEMO_MODE: true,
   DEMO_CREDENTIALS: { email: 'demo@example.com', password: 'demo123' },
+  DEMO_EMAIL: 'demo@stthomasli.org',
+  DEMO_PIN: '123456',
+  setDemoSession: jest.fn(),
+  isDemoSession: () => true,
 }));
 
 // Re-import each test to get a fresh AuthService instance

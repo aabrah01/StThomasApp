@@ -1,5 +1,5 @@
 import { supabase } from '../../supabase.config';
-import { DEMO_MODE, DEMO_CREDENTIALS } from '../utils/config';
+import { DEMO_MODE, DEMO_CREDENTIALS, DEMO_EMAIL, DEMO_PIN, setDemoSession } from '../utils/config';
 import { demoUser } from '../utils/demoData';
 
 class AuthService {
@@ -15,6 +15,12 @@ class AuthService {
         return { error: null };
       }
       return { error: 'This email is not registered with our parish. Please visit the church office to be added.' };
+    }
+
+    // Demo account for App Store review — bypass OTP entirely
+    if (email === DEMO_EMAIL) {
+      await new Promise(resolve => setTimeout(resolve, 600));
+      return { error: null };
     }
 
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -57,6 +63,18 @@ class AuthService {
       return { user: null, error: 'Incorrect code. Please check your email and try again.' };
     }
 
+    // Demo account for App Store review
+    if (email === DEMO_EMAIL) {
+      await new Promise(resolve => setTimeout(resolve, 600));
+      if (token === DEMO_PIN) {
+        this.demoAuthState = demoUser;
+        setDemoSession(true);
+        this.notifyDemoAuthListeners(demoUser);
+        return { user: demoUser, error: null };
+      }
+      return { user: null, error: 'Incorrect code. Please check your email and try again.' };
+    }
+
     const { data, error } = await supabase.auth.verifyOtp({
       email,
       token,
@@ -68,9 +86,10 @@ class AuthService {
   }
 
   async signOut() {
-    if (DEMO_MODE) {
+    if (DEMO_MODE || this.demoAuthState) {
       await new Promise(resolve => setTimeout(resolve, 300));
       this.demoAuthState = null;
+      setDemoSession(false);
       this.notifyDemoAuthListeners(null);
       return { error: null };
     }
@@ -88,7 +107,12 @@ class AuthService {
       };
     }
 
+    // Production: register in demo listeners so demo logins reach the callback,
+    // and also subscribe to Supabase for real users.
+    this.demoAuthListeners.push(callback);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (this.demoAuthState) return; // demo session active — ignore Supabase events
       if (event === 'TOKEN_REFRESH_FAILED') {
         // Stale/invalid refresh token — Supabase already cleared storage; propagate sign-out
         supabase.auth.signOut().finally(() => callback(null));
@@ -96,11 +120,15 @@ class AuthService {
       }
       callback(session?.user || null);
     });
-    return () => subscription.unsubscribe();
+
+    return () => {
+      this.demoAuthListeners = this.demoAuthListeners.filter(cb => cb !== callback);
+      subscription.unsubscribe();
+    };
   }
 
   getCurrentUser() {
-    if (DEMO_MODE) return this.demoAuthState;
+    if (DEMO_MODE || this.demoAuthState) return this.demoAuthState;
     return supabase.auth.getUser();
   }
 
