@@ -199,6 +199,7 @@ export const demoMembers = [
 ];
 
 export const demoUser = {
+  id: 'demo-user-1',
   uid: 'demo-user-1',
   email: 'demo@stthomasli.org',
   emailVerified: true,
