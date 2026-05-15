@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../utils/constants';
-import { DEMO_MODE } from '../utils/config';
+import { isDemoSession } from '../utils/config';
 import { demoEvents } from '../utils/demoData';
 
 class CalendarService {
@@ -18,7 +18,7 @@ class CalendarService {
 
   async getEvents(timeMin, timeMax) {
     // Demo mode: Return mock events
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
       return { data: demoEvents, error: null };
     }

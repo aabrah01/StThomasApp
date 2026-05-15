@@ -200,7 +200,7 @@ export const demoMembers = [
 
 export const demoUser = {
   uid: 'demo-user-1',
-  email: 'demo@example.com',
+  email: 'demo@stthomasli.org',
   emailVerified: true,
 };
 

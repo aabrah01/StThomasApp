@@ -14,6 +14,10 @@
 jest.mock('../../utils/config', () => ({
   DEMO_MODE: false,
   DEMO_CREDENTIALS: { email: 'demo@example.com', password: 'demo123' },
+  DEMO_EMAIL: 'demo@stthomasli.org',
+  DEMO_PIN: '123456',
+  setDemoSession: jest.fn(),
+  isDemoSession: () => false,
 }));
 
 const mockSignOut           = jest.fn().mockResolvedValue({ error: null });

@@ -6,12 +6,13 @@
 jest.mock('../../utils/config', () => ({
   DEMO_MODE: true,
   DEMO_CREDENTIALS: { email: 'demo@example.com', password: 'demo123' },
+  isDemoSession: () => true,
 }));
 
 let db;
 beforeEach(() => {
   jest.resetModules();
-  jest.mock('../../utils/config', () => ({ DEMO_MODE: true }));
+  jest.mock('../../utils/config', () => ({ DEMO_MODE: true, isDemoSession: () => true }));
   db = require('../../services/databaseService').default;
 });
 

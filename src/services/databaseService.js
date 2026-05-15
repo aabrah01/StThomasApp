@@ -6,7 +6,7 @@
  * rest of the app code (and demo data) stays unchanged.
  */
 import { supabase } from '../../supabase.config';
-import { DEMO_MODE } from '../utils/config';
+import { isDemoSession } from '../utils/config';
 import {
   demoFamilies,
   demoMembers,
@@ -81,7 +81,7 @@ class DatabaseService {
   }
 
   async updateFamilyPhoto(familyId, photoUrl) {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       demoPhotoOverrides[familyId] = photoUrl;
       return { error: null };
     }
@@ -93,7 +93,7 @@ class DatabaseService {
   }
 
   async getAllFamilies() {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 300));
       const families = demoFamilies
         .filter(f => f.isActive)
@@ -135,7 +135,7 @@ class DatabaseService {
   }
 
   async getFamilyById(familyId) {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       const family = demoFamilies.find(f => f.id === familyId);
       if (!family) return { data: null, error: 'Family not found' };
@@ -156,7 +156,7 @@ class DatabaseService {
   }
 
   async getMembersByFamilyId(familyId) {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       const members = demoMembers.filter(m => m.familyId === familyId && m.isActive);
       return { data: members, error: null };
@@ -173,7 +173,7 @@ class DatabaseService {
   }
 
   async getMemberByUserId(userId) {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       const member = demoMembers.find(m => m.userId === userId);
       if (!member) return { data: null, error: 'Member not found' };
@@ -223,7 +223,7 @@ class DatabaseService {
   }
 
   async getUserRole(userId) {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       return { data: demoUserRole, error: null };
     }
@@ -252,7 +252,7 @@ class DatabaseService {
    * The contributions table schema is in /supabase/schema.sql.
    */
   async getContributions(familyId, year) {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       const contributions = demoContributions.filter(
         c => c.familyId === familyId && c.fiscalYear === year
@@ -272,7 +272,7 @@ class DatabaseService {
   }
 
   async getContributionSettings() {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       return { asofDate: new Date().toISOString().slice(0, 10) };
     }
@@ -288,7 +288,7 @@ class DatabaseService {
   }
 
   async getMealSignupCount(eventDate) {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       return { data: demoMealSignups.filter(s => s.eventDate === eventDate).length, error: null };
     }
@@ -298,7 +298,7 @@ class DatabaseService {
   }
 
   async getMealSignups(eventDate) {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       const signups = demoMealSignups
         .filter(s => s.eventDate === eventDate)
@@ -332,7 +332,7 @@ class DatabaseService {
   }
 
   async createMealSignup(memberId, eventDate) {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       const existing = demoMealSignups.find(s => s.memberId === memberId && s.eventDate === eventDate);
       if (existing) return { data: existing, error: null };
@@ -350,7 +350,7 @@ class DatabaseService {
   }
 
   async deleteMealSignup(signupId) {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       const idx = demoMealSignups.findIndex(s => s.id === signupId);
       if (idx !== -1) demoMealSignups.splice(idx, 1);
@@ -361,7 +361,7 @@ class DatabaseService {
   }
 
   async getMealSignupDates(fromDate, toDate) {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       const dates = [...new Set(
         demoMealSignups
@@ -376,7 +376,7 @@ class DatabaseService {
   }
 
   async getAppSettings() {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       return { data: demoAppSettings, error: null };
     }

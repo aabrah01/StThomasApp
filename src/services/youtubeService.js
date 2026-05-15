@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../utils/constants';
-import { DEMO_MODE } from '../utils/config';
+import { isDemoSession } from '../utils/config';
 import { demoYoutubeVideos } from '../utils/demoData';
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -161,7 +161,7 @@ class YoutubeService {
   }
 
   async getVideosMap(year = new Date().getFullYear()) {
-    if (DEMO_MODE) {
+    if (isDemoSession()) {
       return demoYoutubeVideos;
     }
 
