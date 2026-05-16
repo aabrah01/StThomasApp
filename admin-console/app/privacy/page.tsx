@@ -6,7 +6,7 @@ export default function PrivacyPolicy() {
 
       <h2 style={{ fontSize: 20, marginTop: 32 }}>1. Introduction</h2>
       <p>
-        St. Thomas of Canterbury Roman Catholic Church ("we", "our", or "us") operates the StThomasLI mobile
+        St. Thomas Malankara Orthodox Church, Long Island ("we", "our", or "us") operates the StThomasLI mobile
         application. This policy explains how we collect, use, and protect your personal information.
       </p>
 
@@ -31,7 +31,7 @@ export default function PrivacyPolicy() {
       <h2 style={{ fontSize: 20, marginTop: 32 }}>4. Information Sharing</h2>
       <p>
         We do not sell, trade, or share your personal information with third parties. Directory information
-        is visible only to verified members of St. Thomas of Canterbury parish.
+        is visible only to verified members of St. Thomas Malankara Orthodox Church, Long Island parish.
       </p>
 
       <h2 style={{ fontSize: 20, marginTop: 32 }}>5. Data Security</h2>
@@ -51,8 +51,8 @@ export default function PrivacyPolicy() {
       <h2 style={{ fontSize: 20, marginTop: 32 }}>7. Contact Us</h2>
       <p>
         If you have questions about this privacy policy or your data, please contact the parish office at{' '}
-        <a href="mailto:office@saintthomasofcanterbury.org" style={{ color: '#1A4FC4' }}>
-          office@saintthomasofcanterbury.org
+        <a href="mailto:webmaster@stthomasli.org" style={{ color: '#1A4FC4' }}>
+          webmaster@stthomasli.org
         </a>
       </p>
     </div>
