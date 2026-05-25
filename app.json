@@ -2,7 +2,7 @@
   "expo": {
     "name": "StThomasLI",
     "slug": "st-thomas-app",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -23,7 +23,8 @@
       "bundleIdentifier": "com.stthomas.directory",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "LSApplicationQueriesSchemes": ["zelle"]
+        "LSApplicationQueriesSchemes": ["zelle"],
+        "NSPhotoLibraryUsageDescription": "Access to Photos is required for you to pick the photo for your family in the directory."
       }
     },
     "android": {
