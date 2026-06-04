@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import databaseService from '../../services/databaseService';
 
 
-const FoodDonationCard = React.memo(({ eventDate, onSignupChange }) => {
+const FoodDonationCard = React.memo(({ eventDate, onSignupChange, refreshKey }) => {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { member, isAdmin } = useAuth();
@@ -37,7 +37,7 @@ const FoodDonationCard = React.memo(({ eventDate, onSignupChange }) => {
     setSignups([]);
     setCount(0);
     load();
-  }, [load]);
+  }, [load, refreshKey]);
 
   const isPast = eventDate < new Date().toISOString().split('T')[0];
 
@@ -107,7 +107,10 @@ const FoodDonationCard = React.memo(({ eventDate, onSignupChange }) => {
                 <View style={styles.adminList}>
                   {signups.map(s => (
                     <Text key={s.id} style={styles.adminName}>
-                      • {s.member?.firstName} {s.member?.lastName}
+                      {s.member?.firstName} {s.member?.lastName}
+                      {s.member?.membershipId ? (
+                        <Text style={styles.adminMembershipId}>{` [${s.member.membershipId}]`}</Text>
+                      ) : null}
                     </Text>
                   ))}
                 </View>
@@ -186,8 +189,9 @@ const makeStyles = (theme) => StyleSheet.create({
     padding: theme.spacing.md,
   },
   countText: {
-    fontSize: theme.fonts.sizes.sm,
-    color: theme.colors.textSecondary,
+    fontSize: theme.fonts.sizes.md,
+    color: theme.colors.text,
+    fontWeight: '600',
     marginBottom: theme.spacing.xs,
   },
   familyText: {
@@ -201,11 +205,17 @@ const makeStyles = (theme) => StyleSheet.create({
     paddingTop: theme.spacing.sm,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
+    gap: 6,
   },
   adminName: {
+    fontSize: theme.fonts.sizes.md,
+    color: theme.colors.text,
+    fontWeight: '600',
+  },
+  adminMembershipId: {
     fontSize: theme.fonts.sizes.sm,
     color: theme.colors.textSecondary,
-    marginBottom: 2,
+    fontWeight: '400',
   },
   ownRow: {
     flexDirection: 'row',

@@ -315,7 +315,7 @@ class DatabaseService {
     }
     const { data, error } = await supabase
       .from('meal_signups')
-      .select('id, member_id, created_at, member:members(first_name, last_name, family_id)')
+      .select('id, member_id, created_at, member:members(first_name, last_name, family_id, family:families(membership_id))')
       .eq('event_date', eventDate);
     if (error) return { data: null, error: error.message };
     return {
@@ -324,7 +324,12 @@ class DatabaseService {
         memberId: row.member_id,
         createdAt: row.created_at,
         member: row.member
-          ? { firstName: row.member.first_name, lastName: row.member.last_name, familyId: row.member.family_id }
+          ? {
+              firstName: row.member.first_name,
+              lastName: row.member.last_name,
+              familyId: row.member.family_id,
+              membershipId: row.member.family?.membership_id ?? null,
+            }
           : null,
       })),
       error: null,

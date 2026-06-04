@@ -30,8 +30,8 @@ export const AuthProvider = ({ children }) => {
           }
         }
 
-        if (!memberData) {
-          // No matching member record — reject access
+        if (!memberData && roleData?.role !== 'admin') {
+          // No matching member record and not an admin — reject access
           await authService.signOut();
           setAuthError('Your account is not registered as a church member. Please contact the church office.');
           // Don't set loading=false here — signOut triggers onAuthStateChange again with null,

@@ -362,6 +362,7 @@ const CalendarScreen = ({ navigation }) => {
                   <FoodDonationCard
                     eventDate={selectedDate}
                     onSignupChange={handleSignupChange}
+                    refreshKey={refreshing}
                   />
                 )}
                 {selectedVideos.map((video) => (
