@@ -86,7 +86,7 @@ export default function UsersClient({ users: initial }: { users: User[] }) {
         {createMsg && (
           <p className={`text-sm mb-3 ${createMsg.includes('granted') ? 'text-green-600' : 'text-red-600'}`}>{createMsg}</p>
         )}
-        <form onSubmit={handleCreate} className="flex gap-3 items-end">
+        <form onSubmit={handleCreate} className="flex flex-col sm:flex-row gap-3 sm:items-end">
           <div className="flex-1">
             <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Email Address *</label>
             <input
@@ -105,8 +105,47 @@ export default function UsersClient({ users: initial }: { users: User[] }) {
         </form>
       </div>
 
-      {/* User list */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* User list — mobile: cards */}
+      <div className="md:hidden space-y-2">
+        {users.map(u => (
+          <div key={u.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-medium text-gray-900 truncate">{u.email}</div>
+                {u.memberName
+                  ? <div className="text-gray-600 text-sm truncate">{u.memberName}</div>
+                  : <div className="text-gray-400 text-xs italic">No matching member</div>}
+                <div className="text-gray-500 text-xs mt-1">
+                  Last sign-in: {u.lastSignIn ? new Date(u.lastSignIn).toLocaleDateString() : 'Never'}
+                </div>
+              </div>
+              <button onClick={() => handleDelete(u)} className="text-red-400 hover:text-red-600 text-sm font-medium shrink-0">Remove</button>
+            </div>
+            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-50">
+              <label className="flex items-center gap-2 text-xs text-gray-600">
+                Role
+                <select value={u.role} onChange={e => handleRoleChange(u.id, e.target.value)}
+                  className="border border-gray-200 rounded px-2 h-[30px] text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#7E282F]">
+                  <option value="member">Member</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </label>
+              {u.memberId && (
+                <label className="flex items-center gap-2 text-xs text-gray-600">
+                  HOH
+                  <button onClick={() => handleHohToggle(u)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${u.isHoh ? 'bg-[#7E282F]' : 'bg-gray-200'}`}>
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${u.isHoh ? 'translate-x-4' : 'translate-x-1'}`} />
+                  </button>
+                </label>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* User list — desktop: table */}
+      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">

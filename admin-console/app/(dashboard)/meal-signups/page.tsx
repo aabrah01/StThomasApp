@@ -81,7 +81,7 @@ export default function MealSignupsPage() {
   const groups = groupByDate(signups);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Meal Signups</h1>
         <p className="text-gray-500 text-sm">Members who have pledged to bring food</p>
@@ -102,7 +102,34 @@ export default function MealSignupsPage() {
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
                 {formatDate(date)}
               </h2>
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+              {/* Mobile: card list */}
+              <div className="md:hidden space-y-2">
+                {rows.map(row => (
+                  <div key={row.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-medium text-gray-900">{row.memberName}</div>
+                        <div className="text-gray-600 text-sm">{row.familyName}</div>
+                        <div className="text-gray-500 text-xs mt-1">
+                          {new Date(row.createdAt).toLocaleString('en-US', {
+                            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                          })}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDelete(row.id)}
+                        disabled={deletingId === row.id}
+                        className="text-xs font-semibold text-red-600 hover:text-red-800 disabled:opacity-40 transition-colors shrink-0"
+                      >
+                        {deletingId === row.id ? 'Removing…' : 'Remove'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop: table */}
+              <div className="hidden md:block bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50">
