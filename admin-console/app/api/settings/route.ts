@@ -9,11 +9,14 @@ export async function GET() {
   const supabase = createAdminSupabase();
   const { data } = await supabase
     .from('app_settings')
-    .select('enable_meal_signup')
+    .select('enable_meal_signup, enable_flower_signup')
     .eq('id', 'config')
     .single();
 
-  return NextResponse.json({ enableMealSignup: data?.enable_meal_signup ?? false });
+  return NextResponse.json({
+    enableMealSignup: data?.enable_meal_signup ?? false,
+    enableFlowerSignup: data?.enable_flower_signup ?? false,
+  });
 }
 
 export async function PATCH(request: Request) {
@@ -21,16 +24,30 @@ export async function PATCH(request: Request) {
   if (isError(auth)) return auth;
 
   const body = await request.json();
-  const { enableMealSignup } = body;
+  const { enableMealSignup, enableFlowerSignup } = body;
 
-  if (typeof enableMealSignup !== 'boolean') {
-    return NextResponse.json({ error: 'enableMealSignup must be a boolean' }, { status: 400 });
+  const updates: Record<string, boolean> = {};
+  if (enableMealSignup !== undefined) {
+    if (typeof enableMealSignup !== 'boolean') {
+      return NextResponse.json({ error: 'enableMealSignup must be a boolean' }, { status: 400 });
+    }
+    updates.enable_meal_signup = enableMealSignup;
+  }
+  if (enableFlowerSignup !== undefined) {
+    if (typeof enableFlowerSignup !== 'boolean') {
+      return NextResponse.json({ error: 'enableFlowerSignup must be a boolean' }, { status: 400 });
+    }
+    updates.enable_flower_signup = enableFlowerSignup;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'No settings provided' }, { status: 400 });
   }
 
   const supabase = createAdminSupabase();
   const { error } = await supabase
     .from('app_settings')
-    .upsert({ id: 'config', enable_meal_signup: enableMealSignup });
+    .upsert({ id: 'config', ...updates });
 
   if (error) return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
 
@@ -39,8 +56,8 @@ export async function PATCH(request: Request) {
     action: 'update',
     table_name: 'app_settings',
     record_id: 'config',
-    details: { enableMealSignup },
+    details: { enableMealSignup, enableFlowerSignup },
   });
 
-  return NextResponse.json({ enableMealSignup });
+  return NextResponse.json({ enableMealSignup, enableFlowerSignup });
 }

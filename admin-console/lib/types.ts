@@ -44,6 +44,15 @@ export interface MealSignup {
   createdAt: string;
 }
 
+export interface FlowerSignup {
+  id: string;
+  eventDate: string;
+  memberId: string;
+  memberName: string;
+  familyName: string;
+  createdAt: string;
+}
+
 export interface UserRole {
   id: string;
   userId: string;

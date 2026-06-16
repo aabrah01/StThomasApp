@@ -21,6 +21,9 @@ const demoPhotoOverrides = {};
 // In-memory meal signup store for demo mode
 const demoMealSignups = [];
 
+// In-memory flower signup store for demo mode
+const demoFlowerSignups = [];
+
 // ── Row mappers ───────────────────────────────────────────────────────────────
 
 const mapFamily = (row) => ({
@@ -61,6 +64,7 @@ const mapAppSettings = (row) => ({
   churchAddress: row.church_address,
   contactEmail: row.contact_email,
   enableMealSignup: row.enable_meal_signup ?? false,
+  enableFlowerSignup: row.enable_flower_signup ?? false,
 });
 
 const mapContribution = (row) => ({
@@ -376,6 +380,99 @@ class DatabaseService {
       return { data: dates, error: null };
     }
     const { data, error } = await supabase.rpc('meal_signup_dates_in_range', { p_from: fromDate, p_to: toDate });
+    if (error) return { data: null, error: error.message };
+    return { data: (data ?? []).map(row => row.event_date), error: null };
+  }
+
+  async getFlowerSignupCount(eventDate) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return { data: demoFlowerSignups.filter(s => s.eventDate === eventDate).length, error: null };
+    }
+    const { data, error } = await supabase.rpc('flower_signup_count', { p_date: eventDate });
+    if (error) return { data: 0, error: error.message };
+    return { data: Number(data), error: null };
+  }
+
+  async getFlowerSignups(eventDate) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const signups = demoFlowerSignups
+        .filter(s => s.eventDate === eventDate)
+        .map(s => {
+          const m = demoMembers.find(dm => dm.id === s.memberId);
+          return {
+            id: s.id,
+            memberId: s.memberId,
+            createdAt: s.createdAt,
+            member: m ? { firstName: m.firstName, lastName: m.lastName, familyId: m.familyId } : null,
+          };
+        });
+      return { data: signups, error: null };
+    }
+    const { data, error } = await supabase
+      .from('flower_signups')
+      .select('id, member_id, created_at, member:members(first_name, last_name, family_id, family:families(membership_id))')
+      .eq('event_date', eventDate);
+    if (error) return { data: null, error: error.message };
+    return {
+      data: (data ?? []).map(row => ({
+        id: row.id,
+        memberId: row.member_id,
+        createdAt: row.created_at,
+        member: row.member
+          ? {
+              firstName: row.member.first_name,
+              lastName: row.member.last_name,
+              familyId: row.member.family_id,
+              membershipId: row.member.family?.membership_id ?? null,
+            }
+          : null,
+      })),
+      error: null,
+    };
+  }
+
+  async createFlowerSignup(memberId, eventDate) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const existing = demoFlowerSignups.find(s => s.memberId === memberId && s.eventDate === eventDate);
+      if (existing) return { data: existing, error: null };
+      const signup = { id: `demo-signup-${Date.now()}`, memberId, eventDate, createdAt: new Date().toISOString() };
+      demoFlowerSignups.push(signup);
+      return { data: signup, error: null };
+    }
+    const { data, error } = await supabase
+      .from('flower_signups')
+      .insert({ member_id: memberId, event_date: eventDate })
+      .select('id')
+      .single();
+    if (error) return { data: null, error: error.message };
+    return { data: { id: data.id }, error: null };
+  }
+
+  async deleteFlowerSignup(signupId) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const idx = demoFlowerSignups.findIndex(s => s.id === signupId);
+      if (idx !== -1) demoFlowerSignups.splice(idx, 1);
+      return { error: null };
+    }
+    const { error } = await supabase.from('flower_signups').delete().eq('id', signupId);
+    return { error: error?.message ?? null };
+  }
+
+  async getFlowerSignupDates(fromDate, toDate) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const dates = [...new Set(
+        demoFlowerSignups
+          .filter(s => s.eventDate >= fromDate && s.eventDate <= toDate)
+          .map(s => s.eventDate)
+      )];
+      return { data: dates, error: null };
+    }
+    const { data, error } = await supabase.rpc('flower_signup_dates_in_range', { p_from: fromDate, p_to: toDate });
     if (error) return { data: null, error: error.message };
     return { data: (data ?? []).map(row => row.event_date), error: null };
   }

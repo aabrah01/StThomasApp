@@ -17,6 +17,7 @@ import youtubeService from '../../services/youtubeService';
 import databaseService from '../../services/databaseService';
 import EventCard from '../../components/calendar/EventCard';
 import FoodDonationCard from '../../components/calendar/FoodDonationCard';
+import FlowerDonationCard from '../../components/calendar/FlowerDonationCard';
 import HomiliesCard from '../../components/calendar/HomiliesCard';
 import VideoPlayerModal from './VideoPlayerModal';
 import ErrorMessage from '../../components/common/ErrorMessage';
@@ -37,6 +38,7 @@ const CalendarScreen = ({ navigation }) => {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const commonStyles = useCommonStyles();
   const [mealSignupEnabled, setMealSignupEnabled] = useState(false);
+  const [flowerSignupEnabled, setFlowerSignupEnabled] = useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const calendarWidth = isTablet ? Math.min(width, 800) : width;
@@ -55,6 +57,8 @@ const CalendarScreen = ({ navigation }) => {
   const [churchName, setChurchName] = useState('');
   const [signupDates, setSignupDates] = useState(new Set());
   const signupRangeRef = useRef({ min: null, max: null });
+  const [flowerSignupDates, setFlowerSignupDates] = useState(new Set());
+  const flowerSignupRangeRef = useRef({ min: null, max: null });
   const [displayedMonth, setDisplayedMonth] = useState(todayMonth);
   const [calendarResetKey, setCalendarResetKey] = useState(0);
   const { markScreenReady } = useDataReady();
@@ -75,13 +79,14 @@ const CalendarScreen = ({ navigation }) => {
 
   useEffect(() => {
     markEventDates();
-  }, [events, videosMap, selectedDate, theme, signupDates, mealSignupEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [events, videosMap, selectedDate, theme, signupDates, mealSignupEnabled, flowerSignupDates, flowerSignupEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initializeCalendar = async () => {
     const { data: settings } = await databaseService.getAppSettings();
 
     if (settings?.churchName) setChurchName(settings.churchName);
     setMealSignupEnabled(settings?.enableMealSignup ?? false);
+    setFlowerSignupEnabled(settings?.enableFlowerSignup ?? false);
 
     if (settings?.googleCalendarId && settings?.googleApiKey) {
       calendarService.setConfig(settings.googleCalendarId, settings.googleApiKey);
@@ -120,6 +125,13 @@ const CalendarScreen = ({ navigation }) => {
           true,
         );
       }
+      if (flowerSignupEnabled) {
+        loadFlowerSignupDates(
+          timeMin.toISOString().split('T')[0],
+          timeMax.toISOString().split('T')[0],
+          true,
+        );
+      }
     }
 
     setLoading(false);
@@ -132,6 +144,14 @@ const CalendarScreen = ({ navigation }) => {
     if (data) {
       setSignupDates(prev => replace ? new Set(data) : new Set([...prev, ...data]));
       signupRangeRef.current = { min: fromDate, max: toDate };
+    }
+  };
+
+  const loadFlowerSignupDates = async (fromDate, toDate, replace = false) => {
+    const { data } = await databaseService.getFlowerSignupDates(fromDate, toDate);
+    if (data) {
+      setFlowerSignupDates(prev => replace ? new Set(data) : new Set([...prev, ...data]));
+      flowerSignupRangeRef.current = { min: fromDate, max: toDate };
     }
   };
 
@@ -155,6 +175,7 @@ const CalendarScreen = ({ navigation }) => {
 
     // Always fetch fresh signup dates for the new month (merge into existing set)
     if (mealSignupEnabled) loadMealSignupDates(monthStartStr, monthEndStr);
+    if (flowerSignupEnabled) loadFlowerSignupDates(monthStartStr, monthEndStr);
 
     const { min, max } = loadedRangeRef.current;
     if (!min || !max) return;
@@ -215,6 +236,18 @@ const CalendarScreen = ({ navigation }) => {
       }
     });
 
+    if (flowerSignupEnabled) flowerSignupDates.forEach((date) => {
+      if (date < todayString) return;
+      const existing = marked[date]?.dots || [];
+      const alreadyHasFlower = existing.some(d => d.key === 'flower');
+      if (!alreadyHasFlower) {
+        marked[date] = {
+          ...marked[date],
+          dots: [...existing, { key: 'flower', color: '#C2185B', selectedDotColor: '#FFFFFF' }],
+        };
+      }
+    });
+
     marked[selectedDate] = {
       ...marked[selectedDate],
       selected: true,
@@ -258,6 +291,7 @@ const CalendarScreen = ({ navigation }) => {
     setRefreshing(true);
     const { data: settings } = await databaseService.getAppSettings();
     setMealSignupEnabled(settings?.enableMealSignup ?? false);
+    setFlowerSignupEnabled(settings?.enableFlowerSignup ?? false);
     loadEvents();
     loadedYearsRef.current.clear();
     setVideosMap({});
@@ -278,6 +312,11 @@ const CalendarScreen = ({ navigation }) => {
     if (min && max) loadMealSignupDates(min, max);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleFlowerSignupChange = useCallback(() => {
+    const { min, max } = flowerSignupRangeRef.current;
+    if (min && max) loadFlowerSignupDates(min, max);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const renderEventItem = useCallback(({ item }) => (
     <EventCard event={item} onPress={handleEventPress} />
   ), [handleEventPress]);
@@ -285,6 +324,7 @@ const CalendarScreen = ({ navigation }) => {
   const selectedEvents = getEventsForSelectedDate();
   const selectedVideos = videosMap[selectedDate] || [];
   const showFoodCard = mealSignupEnabled && selectedEvents.some(e => !e.isAllDay);
+  const showFlowerCard = flowerSignupEnabled && selectedEvents.some(e => !e.isAllDay);
   const totalCount = selectedEvents.length + selectedVideos.length;
   // Append T00:00:00 so the string is parsed as local time, not UTC midnight
   const formattedDate = new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-US', {
@@ -356,15 +396,8 @@ const CalendarScreen = ({ navigation }) => {
           data={selectedEvents}
           keyExtractor={(item) => item.id}
           ListHeaderComponent={
-            (showFoodCard || selectedVideos.length > 0) ? (
+            selectedVideos.length > 0 ? (
               <>
-                {showFoodCard && (
-                  <FoodDonationCard
-                    eventDate={selectedDate}
-                    onSignupChange={handleSignupChange}
-                    refreshKey={refreshing}
-                  />
-                )}
                 {selectedVideos.map((video) => (
                   <HomiliesCard
                     key={video.videoId}
@@ -379,11 +412,31 @@ const CalendarScreen = ({ navigation }) => {
             ) : null
           }
           ListEmptyComponent={
-            selectedVideos.length === 0 && !showFoodCard ? (
+            selectedVideos.length === 0 && !showFoodCard && !showFlowerCard ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyIcon}>📭</Text>
                 <Text style={styles.emptyText}>No events on this day</Text>
               </View>
+            ) : null
+          }
+          ListFooterComponent={
+            (showFoodCard || showFlowerCard) ? (
+              <>
+                {showFoodCard && (
+                  <FoodDonationCard
+                    eventDate={selectedDate}
+                    onSignupChange={handleSignupChange}
+                    refreshKey={refreshing}
+                  />
+                )}
+                {showFlowerCard && (
+                  <FlowerDonationCard
+                    eventDate={selectedDate}
+                    onSignupChange={handleFlowerSignupChange}
+                    refreshKey={refreshing}
+                  />
+                )}
+              </>
             ) : null
           }
           renderItem={renderEventItem}

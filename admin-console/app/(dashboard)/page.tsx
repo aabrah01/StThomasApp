@@ -7,31 +7,37 @@ const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  let familyCount: number, memberCount: number, contribCount: number;
+  let familyCount: number, memberCount: number, contribCount: number, appUserCount: number;
   let enableMealSignup = false;
+  let enableFlowerSignup = false;
 
   if (DEMO_MODE) {
     familyCount = DEMO_FAMILIES.length;
     memberCount = DEMO_MEMBERS.length;
     contribCount = DEMO_CONTRIBUTIONS.length;
+    appUserCount = 3;
   } else {
     const supabase = createAdminSupabase();
-    const [fc, mc, cc, settings] = await Promise.all([
+    const [fc, mc, cc, uc, settings] = await Promise.all([
       supabase.from('families').select('*', { count: 'exact', head: true }),
       supabase.from('members').select('*', { count: 'exact', head: true }),
       supabase.from('contributions').select('*', { count: 'exact', head: true }),
-      supabase.from('app_settings').select('enable_meal_signup').eq('id', 'config').single(),
+      supabase.from('member_users').select('*', { count: 'exact', head: true }),
+      supabase.from('app_settings').select('enable_meal_signup, enable_flower_signup').eq('id', 'config').single(),
     ]);
     familyCount = fc.count ?? 0;
     memberCount = mc.count ?? 0;
     contribCount = cc.count ?? 0;
+    appUserCount = uc.count ?? 0;
     enableMealSignup = settings.data?.enable_meal_signup ?? false;
+    enableFlowerSignup = settings.data?.enable_flower_signup ?? false;
   }
 
   const stats = [
-    { label: 'Families',      value: familyCount,  icon: '🏠', href: '/families' },
-    { label: 'Members',       value: memberCount,   icon: '👤', href: '/members' },
-    { label: 'Contributions', value: contribCount,  icon: '💰', href: '/contributions' },
+    { label: 'Families',      value: familyCount,   icon: '🏠', href: '/families' },
+    { label: 'Members',       value: memberCount,    icon: '👤', href: '/members' },
+    { label: 'Contributions', value: contribCount,   icon: '💰', href: '/contributions' },
+    { label: 'App Users',     value: appUserCount,   icon: '📱', href: '/users' },
   ];
 
   return (
@@ -62,7 +68,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <FeaturesSection initialEnableMealSignup={enableMealSignup} />
+      <FeaturesSection initialEnableMealSignup={enableMealSignup} initialEnableFlowerSignup={enableFlowerSignup} />
     </div>
   );
 }
