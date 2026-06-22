@@ -2,7 +2,7 @@
   "expo": {
     "name": "StThomasLI",
     "slug": "st-thomas-app",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -30,11 +30,11 @@
     "android": {
       "icon": "./assets/android_legacy_icon.png",
       "splash": {
-        "image": "./assets/splash.png",
+        "image": "./assets/icon_transparent.png",
         "resizeMode": "contain",
         "backgroundColor": "#F5EFE0",
         "dark": {
-          "image": "./assets/splash_dark.png",
+          "image": "./assets/icon_transparent.png",
           "backgroundColor": "#120A0C"
         }
       },
