@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import { Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -16,6 +15,9 @@ import FamilyDetailScreen from '../screens/directory/FamilyDetailScreen';
 import CalendarScreen from '../screens/calendar/CalendarScreen';
 import EventDetailScreen from '../screens/calendar/EventDetailScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import DocumentsScreen from '../screens/documents/DocumentsScreen';
+import DocumentViewerScreen from '../screens/documents/DocumentViewerScreen';
+import HeaderMenu from '../components/common/HeaderMenu';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -69,13 +71,7 @@ const MainTabs = () => {
           fontSize: theme.fonts.sizes.lg,
         },
         headerTitleAlign: 'center',
-        headerRight: () => (
-          <Image
-            source={require('../../assets/icon_transparent.png')}
-            style={{ width: 40, height: 40, marginRight: 12, transform: [{ translateY: -10 }] }}
-            resizeMode="contain"
-          />
-        ),
+        headerRight: () => <HeaderMenu />,
       }}
     >
       <Tab.Screen
@@ -118,6 +114,8 @@ const AppStack = () => {
       <Stack.Screen name="MainTabs" component={MainTabs} />
       <Stack.Screen name="FamilyDetail" component={FamilyDetailScreen} />
       <Stack.Screen name="EventDetail" component={EventDetailScreen} />
+      <Stack.Screen name="Documents" component={DocumentsScreen} />
+      <Stack.Screen name="DocumentViewer" component={DocumentViewerScreen} />
     </Stack.Navigator>
   );
 };

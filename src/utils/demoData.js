@@ -489,7 +489,16 @@ export const demoAppSettings = {
   contactEmail: 'info@stthomas.org',
   enableMealSignup: true,
   enableFlowerSignup: true,
+  enableDocuments: true,
+  assemblyDocsFolderId: 'demo-folder',
 };
+
+// Demo assembly documents — shown in demo mode in place of a Drive folder listing
+export const demoDocuments = [
+  { id: 'demo-doc-1', name: 'General Assembly Agenda', modifiedTime: '2026-06-20T14:00:00Z' },
+  { id: 'demo-doc-2', name: 'Annual Financial Report', modifiedTime: '2026-06-18T09:30:00Z' },
+  { id: 'demo-doc-3', name: 'Previous Meeting Minutes', modifiedTime: '2026-06-15T16:45:00Z' },
+];
 
 // Keyed by YYYY-MM-DD — each entry is a public YouTube video for that Sunday's homily
 export const demoYoutubeVideos = {

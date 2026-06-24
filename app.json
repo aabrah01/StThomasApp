@@ -2,7 +2,7 @@
   "expo": {
     "name": "StThomasLI",
     "slug": "st-thomas-app",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -21,6 +21,15 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.stthomasli.app",
+      "splash": {
+        "image": "./assets/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#F5EFE0",
+        "dark": {
+          "image": "./assets/splash_dark.png",
+          "backgroundColor": "#120A0C"
+        }
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "LSApplicationQueriesSchemes": ["zelle"],

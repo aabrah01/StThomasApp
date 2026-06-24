@@ -65,6 +65,8 @@ const mapAppSettings = (row) => ({
   contactEmail: row.contact_email,
   enableMealSignup: row.enable_meal_signup ?? false,
   enableFlowerSignup: row.enable_flower_signup ?? false,
+  enableDocuments: row.enable_documents ?? false,
+  assemblyDocsFolderId: row.assembly_docs_folder_id ?? null,
 });
 
 const mapContribution = (row) => ({

@@ -10,6 +10,8 @@ export default async function DashboardPage() {
   let familyCount: number, memberCount: number, contribCount: number, appUserCount: number;
   let enableMealSignup = false;
   let enableFlowerSignup = false;
+  let enableDocuments = false;
+  let assemblyDocsFolderId = '';
 
   if (DEMO_MODE) {
     familyCount = DEMO_FAMILIES.length;
@@ -23,7 +25,7 @@ export default async function DashboardPage() {
       supabase.from('members').select('*', { count: 'exact', head: true }),
       supabase.from('contributions').select('*', { count: 'exact', head: true }),
       supabase.from('member_users').select('*', { count: 'exact', head: true }),
-      supabase.from('app_settings').select('enable_meal_signup, enable_flower_signup').eq('id', 'config').single(),
+      supabase.from('app_settings').select('enable_meal_signup, enable_flower_signup, enable_documents, assembly_docs_folder_id').eq('id', 'config').single(),
     ]);
     familyCount = fc.count ?? 0;
     memberCount = mc.count ?? 0;
@@ -31,6 +33,8 @@ export default async function DashboardPage() {
     appUserCount = uc.count ?? 0;
     enableMealSignup = settings.data?.enable_meal_signup ?? false;
     enableFlowerSignup = settings.data?.enable_flower_signup ?? false;
+    enableDocuments = settings.data?.enable_documents ?? false;
+    assemblyDocsFolderId = settings.data?.assembly_docs_folder_id ?? '';
   }
 
   const stats = [
@@ -68,7 +72,12 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <FeaturesSection initialEnableMealSignup={enableMealSignup} initialEnableFlowerSignup={enableFlowerSignup} />
+      <FeaturesSection
+        initialEnableMealSignup={enableMealSignup}
+        initialEnableFlowerSignup={enableFlowerSignup}
+        initialEnableDocuments={enableDocuments}
+        initialAssemblyDocsFolderId={assemblyDocsFolderId}
+      />
     </div>
   );
 }
