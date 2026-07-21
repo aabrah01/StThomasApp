@@ -189,7 +189,7 @@ const ProfileScreen = ({ navigation }) => {
     try {
       await generateAndShareStatement(member.familyId);
     } catch (e) {
-      Alert.alert('Could not generate statement', 'Please try again.');
+      Alert.alert('Could not generate statement', e.message || 'Please try again.');
     } finally {
       setGeneratingStatement(false);
     }

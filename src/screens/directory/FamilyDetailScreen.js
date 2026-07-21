@@ -184,7 +184,7 @@ const FamilyDetailScreen = ({ route, navigation }) => {
     try {
       await generateAndShareStatement(family.id);
     } catch (e) {
-      Alert.alert('Could not generate statement', 'Please try again.');
+      Alert.alert('Could not generate statement', e.message || 'Please try again.');
     } finally {
       setGeneratingStatement(false);
     }
