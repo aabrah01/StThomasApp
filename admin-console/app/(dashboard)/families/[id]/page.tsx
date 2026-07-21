@@ -1,7 +1,9 @@
 import { createAdminSupabase } from '@/lib/supabase';
 import { DEMO_FAMILIES, DEMO_MEMBERS } from '@/lib/demoData';
+import { buildGreeting } from '@/lib/greeting';
 import FamilyForm from '@/components/FamilyForm';
 import FamilyContributionsSection from '@/components/FamilyContributionsSection';
+import GenerateStatementForm from '@/components/GenerateStatementForm';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
@@ -18,6 +20,7 @@ export default async function EditFamilyPage({ params }: { params: Promise<{ id:
   } | null = null;
 
   let contributions: { id: string; date: string; amount: number; category: string }[] = [];
+  let statementYear = new Date().getFullYear();
 
   if (DEMO_MODE) {
     const f = DEMO_FAMILIES.find(fam => fam.id === id);
@@ -34,11 +37,12 @@ export default async function EditFamilyPage({ params }: { params: Promise<{ id:
     };
   } else {
     const supabase = createAdminSupabase();
-    const [{ data: f }, { data: m }, { data: contribs }] = await Promise.all([
+    const [{ data: f }, { data: m }, { data: contribs }, { data: settings }] = await Promise.all([
       supabase.from('families').select('*').eq('id', id).single(),
       supabase.from('members').select('*').eq('family_id', id).order('first_name'),
       supabase.from('contributions').select('id, date, amount, category')
         .eq('family_id', id).order('date', { ascending: false }),
+      supabase.from('contribution_settings').select('asof_date').eq('id', 1).single(),
     ]);
     if (!f) notFound();
     family = {
@@ -54,6 +58,7 @@ export default async function EditFamilyPage({ params }: { params: Promise<{ id:
     contributions = (contribs ?? []).map(c => ({
       id: c.id, date: c.date, amount: Number(c.amount), category: c.category,
     }));
+    if (settings?.asof_date) statementYear = new Date(`${settings.asof_date}T00:00:00`).getFullYear();
   }
 
   return (
@@ -65,8 +70,14 @@ export default async function EditFamilyPage({ params }: { params: Promise<{ id:
       </div>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">{family.familyName}</h1>
       <FamilyForm family={family} />
-      <div className="mt-6">
+      <div className="mt-6 space-y-6">
         <FamilyContributionsSection contributions={contributions} />
+        <GenerateStatementForm
+          familyId={family.id}
+          familyName={family.familyName}
+          year={statementYear}
+          defaultGreeting={buildGreeting(family.members, family.familyName)}
+        />
       </div>
     </div>
   );

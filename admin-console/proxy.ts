@@ -25,6 +25,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // ── Statement route: does its own auth (admin cookie or mobile bearer token) ──
+  // The mobile app has no cookie session, so the blanket cookie/admin gate below
+  // would block it before its Authorization header is ever read.
+  if (/^\/api\/families\/[^/]+\/statement$/.test(pathname)) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

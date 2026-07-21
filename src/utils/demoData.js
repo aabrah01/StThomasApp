@@ -479,6 +479,12 @@ export const demoContributions = [
   { id: 'contrib-6', familyId: 'family1', amount: 75.00,  date: '2026-03-15', category: 'Outreach', description: 'Community Outreach Fund', fiscalYear: 2026 },
 ];
 
+// Church-wide requested amount per category, set by admins. Not every category has one.
+export const demoContributionCategoryAmounts = [
+  { category: 'Tithe', requestedAmount: 2000.00 },
+  { category: 'Building Fund', requestedAmount: 250.00 },
+];
+
 
 export const demoAppSettings = {
   googleCalendarId: 'demo-calendar',

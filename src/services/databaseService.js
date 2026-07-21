@@ -13,6 +13,7 @@ import {
   demoUserRole,
   demoAppSettings,
   demoContributions,
+  demoContributionCategoryAmounts,
 } from '../utils/demoData';
 
 // In-memory photo overrides for demo mode
@@ -275,6 +276,23 @@ class DatabaseService {
 
     if (error) return { data: null, error: error.message };
     return { data: data.map(mapContribution), error: null };
+  }
+
+  async getContributionCategoryAmounts() {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return { data: demoContributionCategoryAmounts, error: null };
+    }
+
+    const { data, error } = await supabase
+      .from('contribution_category_amounts')
+      .select('category, requested_amount');
+
+    if (error) return { data: null, error: error.message };
+    return {
+      data: data.map(row => ({ category: row.category, requestedAmount: Number(row.requested_amount) })),
+      error: null,
+    };
   }
 
   async getContributionSettings() {

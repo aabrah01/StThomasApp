@@ -23,14 +23,83 @@ interface CsvRow {
   sourceRow?: number;
 }
 
+interface CategoryAmount {
+  category: string;
+  requestedAmount: number;
+}
+
+interface StatementSettings {
+  introParagraph: string;
+  closingParagraph: string;
+}
+
 interface Props {
   contributions: Contribution[];
   families: { id: string; name: string; membershipId: string }[];
+  categories: string[];
+  initialCategoryAmounts: CategoryAmount[];
+  initialStatementSettings: StatementSettings;
 }
 
-export default function ContributionsClient({ contributions: initial, families }: Props) {
+export default function ContributionsClient({ contributions: initial, families, categories, initialCategoryAmounts, initialStatementSettings }: Props) {
   const [contribs, setContribs] = useState(initial);
   const [panel, setPanel] = useState<null | 'manual'>(null);
+
+  // Requested Amounts (per-category pledge targets)
+  const [amountsByCategory, setAmountsByCategory] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    initialCategoryAmounts.forEach(a => { map[a.category] = String(a.requestedAmount); });
+    return map;
+  });
+  const [savingCategory, setSavingCategory] = useState<string | null>(null);
+  const [newCategory, setNewCategory] = useState('');
+  const [newCategoryAmount, setNewCategoryAmount] = useState('');
+  const allCategories = Array.from(new Set([...categories, ...Object.keys(amountsByCategory)])).sort();
+
+  const saveCategoryAmount = async (category: string, amountStr: string) => {
+    setSavingCategory(category);
+    const requestedAmount = amountStr.trim() === '' ? null : parseFloat(amountStr);
+    const res = await fetch('/api/contributions/category-amounts', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, requestedAmount }),
+    });
+    if (res.ok) {
+      setAmountsByCategory(prev => {
+        const next = { ...prev };
+        if (requestedAmount === null) delete next[category];
+        else next[category] = String(requestedAmount);
+        return next;
+      });
+    }
+    setSavingCategory(null);
+  };
+
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategory.trim() || !newCategoryAmount.trim()) return;
+    await saveCategoryAmount(newCategory.trim(), newCategoryAmount);
+    setNewCategory('');
+    setNewCategoryAmount('');
+  };
+
+  // Statement Settings (intro/closing paragraph, shared across every generated statement)
+  const [introParagraph, setIntroParagraph] = useState(initialStatementSettings.introParagraph);
+  const [closingParagraph, setClosingParagraph] = useState(initialStatementSettings.closingParagraph);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    setSettingsSaved(false);
+    const res = await fetch('/api/contributions/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ introParagraph, closingParagraph }),
+    });
+    if (res.ok) setSettingsSaved(true);
+    setSavingSettings(false);
+  };
   const [csvRows, setCsvRows] = useState<CsvRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState('');
@@ -304,6 +373,86 @@ export default function ContributionsClient({ contributions: initial, families }
             </div>
           )}
         </div>
+
+      {/* Requested Amounts panel — per-category pledge targets shown on generated statements */}
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 space-y-4">
+        <div>
+          <h2 className="font-semibold text-gray-900">Requested Amounts</h2>
+          <p className="text-sm text-gray-500">
+            Set a requested/pledged amount for categories that should show &ldquo;Requested vs. Given&rdquo; on giving statements. Leave blank for pay-as-you-go categories.
+          </p>
+        </div>
+        <div className="divide-y divide-gray-50 border border-gray-100 rounded-lg overflow-hidden">
+          {allCategories.map(category => (
+            <div key={category} className="flex items-center gap-3 px-4 py-2">
+              <span className="flex-1 text-sm text-gray-700">{category}</span>
+              <span className="text-sm text-gray-400">$</span>
+              <input
+                type="number" step="0.01" min="0"
+                value={amountsByCategory[category] ?? ''}
+                onChange={e => setAmountsByCategory(prev => ({ ...prev, [category]: e.target.value }))}
+                onBlur={e => {
+                  if (e.target.value !== (initialCategoryAmounts.find(a => a.category === category)?.requestedAmount != null
+                    ? String(initialCategoryAmounts.find(a => a.category === category)?.requestedAmount) : '')) {
+                    saveCategoryAmount(category, e.target.value);
+                  }
+                }}
+                placeholder="—"
+                className="w-32 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#7E282F]"
+              />
+              {savingCategory === category && <span className="text-xs text-gray-400 w-12">Saving…</span>}
+              {savingCategory !== category && <span className="w-12" />}
+            </div>
+          ))}
+          {allCategories.length === 0 && (
+            <p className="px-4 py-6 text-sm text-gray-400 text-center">No categories yet — import contributions first.</p>
+          )}
+        </div>
+        <form onSubmit={handleAddCategory} className="flex items-end gap-3">
+          <div className="flex-1">
+            <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">New Category</label>
+            <input value={newCategory} onChange={e => setNewCategory(e.target.value)}
+              placeholder="e.g. Building Fund"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#7E282F]" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Requested Amount</label>
+            <input type="number" step="0.01" min="0" value={newCategoryAmount} onChange={e => setNewCategoryAmount(e.target.value)}
+              className="w-36 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#7E282F]" />
+          </div>
+          <button type="submit"
+            className="text-sm font-semibold px-5 py-2 rounded-lg bg-[#7E282F] text-white hover:bg-[#6B2228] transition-colors">
+            Add
+          </button>
+        </form>
+      </div>
+
+      {/* Statement Settings panel — intro/closing paragraphs, same on every generated statement */}
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 space-y-4">
+        <div>
+          <h2 className="font-semibold text-gray-900">Statement Settings</h2>
+          <p className="text-sm text-gray-500">
+            Intro and closing paragraphs used on every giving statement PDF (admin console and mobile app).
+          </p>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Intro Paragraph</label>
+          <textarea rows={4} value={introParagraph} onChange={e => setIntroParagraph(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#7E282F]" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Closing Paragraph</label>
+          <textarea rows={4} value={closingParagraph} onChange={e => setClosingParagraph(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#7E282F]" />
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={handleSaveSettings} disabled={savingSettings}
+            className="text-sm font-semibold px-5 py-2 rounded-lg bg-[#7E282F] text-white hover:bg-[#6B2228] transition-colors disabled:opacity-50">
+            {savingSettings ? 'Saving…' : 'Save Statement Settings'}
+          </button>
+          {settingsSaved && <span className="text-sm text-green-600">Saved.</span>}
+        </div>
+      </div>
 
       {/* Manual entry panel */}
       {panel === 'manual' && (

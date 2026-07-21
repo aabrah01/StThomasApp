@@ -16,6 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '../../context/AuthContext';
 import databaseService from '../../services/databaseService';
 import storageService from '../../services/storageService';
+import { generateAndShareStatement } from '../../services/statementService';
 import ContactInfo from '../../components/directory/ContactInfo';
 import MemberList from '../../components/directory/MemberList';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -38,13 +39,15 @@ const FamilyDetailScreen = ({ route, navigation }) => {
   const [family, setFamily] = useState(null);
   const [members, setMembers] = useState([]);
   const [contributions, setContributions] = useState([]);
+  const [categoryAmounts, setCategoryAmounts] = useState({});
+  const [givingYear, setGivingYear] = useState(new Date().getFullYear());
+  const [asofLabel, setAsofLabel] = useState('');
+  const [generatingStatement, setGeneratingStatement] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [cropModalVisible, setCropModalVisible] = useState(false);
   const [pendingImageUri, setPendingImageUri] = useState(null);
   const [error, setError] = useState('');
-
-  const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     loadFamilyData();
@@ -52,14 +55,30 @@ const FamilyDetailScreen = ({ route, navigation }) => {
 
   const loadFamilyData = async () => {
     setError('');
+
+    let year = new Date().getFullYear();
+    if (isAdmin()) {
+      const settingsResult = await databaseService.getContributionSettings();
+      const asofDate = settingsResult?.asofDate ?? new Date().toISOString().slice(0, 10);
+      const asofObj = new Date(asofDate + 'T00:00:00');
+      year = asofObj.getFullYear();
+      const mm = String(asofObj.getMonth() + 1).padStart(2, '0');
+      const dd = String(asofObj.getDate()).padStart(2, '0');
+      setGivingYear(year);
+      setAsofLabel(`${mm}-${dd}-${year}`);
+    }
+
     const promises = [
       databaseService.getFamilyById(familyId),
       databaseService.getMembersByFamilyId(familyId),
     ];
     if (isAdmin()) {
-      promises.push(databaseService.getContributions(familyId, currentYear));
+      promises.push(
+        databaseService.getContributions(familyId, year),
+        databaseService.getContributionCategoryAmounts(),
+      );
     }
-    const [familyResult, membersResult, contribResult] = await Promise.all(promises);
+    const [familyResult, membersResult, contribResult, categoryAmountsResult] = await Promise.all(promises);
 
     if (familyResult.error) {
       setError(familyResult.error);
@@ -83,6 +102,15 @@ const FamilyDetailScreen = ({ route, navigation }) => {
 
     if (isAdmin() && contribResult?.data) {
       setContributions(contribResult.data);
+    }
+
+    if (isAdmin() && categoryAmountsResult?.data) {
+      setCategoryAmounts(
+        categoryAmountsResult.data.reduce((acc, a) => {
+          acc[a.category] = a.requestedAmount;
+          return acc;
+        }, {})
+      );
     }
 
     setLoading(false);
@@ -148,6 +176,18 @@ const FamilyDetailScreen = ({ route, navigation }) => {
       }
     }
     setUploadingPhoto(false);
+  };
+
+  const handleGenerateStatement = async () => {
+    if (!family || generatingStatement) return;
+    setGeneratingStatement(true);
+    try {
+      await generateAndShareStatement(family.id);
+    } catch (e) {
+      Alert.alert('Could not generate statement', 'Please try again.');
+    } finally {
+      setGeneratingStatement(false);
+    }
   };
 
   if (loading) return <LoadingSpinner />;
@@ -233,9 +273,12 @@ const FamilyDetailScreen = ({ route, navigation }) => {
             acc[c.category] = (acc[c.category] || 0) + c.amount;
             return acc;
           }, {});
+          const sortedCategories = Object.entries(byCategory).sort(
+            ([a], [b]) => (categoryAmounts[b] ?? -1) - (categoryAmounts[a] ?? -1) || a.localeCompare(b)
+          );
           return (
             <View style={styles.section}>
-              <Text style={styles.contribTitle}>Giving · {currentYear} YTD</Text>
+              <Text style={styles.contribTitle}>Giving · {givingYear} YTD as of {asofLabel}</Text>
 
               {/* Total rollup */}
               <View style={styles.contribRow}>
@@ -248,16 +291,25 @@ const FamilyDetailScreen = ({ route, navigation }) => {
                     ${ytdTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </Text>
                 </View>
+                <TouchableOpacity
+                  onPress={handleGenerateStatement}
+                  disabled={generatingStatement}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  {generatingStatement
+                    ? <ActivityIndicator size="small" color={theme.colors.sapphire} />
+                    : <Ionicons name="print-outline" size={22} color={theme.colors.sapphire} />}
+                </TouchableOpacity>
               </View>
 
-              {/* Category breakdown — indented under total */}
-              {Object.entries(byCategory).map(([category, amount], index) => (
+              {/* Category breakdown — indented under total, sorted by requested amount */}
+              {sortedCategories.map(([category, amount], index) => (
                 <View
                   key={category}
                   style={[
                     styles.contribRow,
                     styles.contribCategoryRow,
-                    index === Object.keys(byCategory).length - 1 && styles.contribRowLast,
+                    index === sortedCategories.length - 1 && styles.contribRowLast,
                   ]}
                 >
                   <View style={styles.contribIconBox}>
@@ -267,6 +319,8 @@ const FamilyDetailScreen = ({ route, navigation }) => {
                     <Text style={styles.contribCategoryName} numberOfLines={1}>{category}</Text>
                     <Text style={styles.contribCategoryAmount}>
                       ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      {categoryAmounts[category] != null &&
+                        ` of $${categoryAmounts[category].toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                     </Text>
                   </View>
                 </View>

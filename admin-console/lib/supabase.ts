@@ -14,3 +14,12 @@ export const createAdminSupabase = () =>
   createClient(supabaseUrl, supabaseServiceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+
+// Token-scoped client — for Route Handlers authenticating a non-browser client (e.g. the
+// mobile app) via a Supabase access token instead of a cookie session. Queries run as that
+// user and are subject to RLS, same as the anon/browser client.
+export const createUserScopedSupabase = (accessToken: string) =>
+  createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
