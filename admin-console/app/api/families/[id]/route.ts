@@ -52,7 +52,7 @@ export async function PATCH(request: Request, { params }: Params) {
         first_name: String(m.firstName ?? '').slice(0, 50),
         last_name: String(m.lastName ?? '').slice(0, 50),
         role: m.role ? String(m.role).slice(0, 50) : null,
-        email: m.email ? String(m.email).slice(0, 255) : null,
+        email: m.email ? String(m.email).trim().toLowerCase().slice(0, 255) : null,
         phone_number: m.phoneNumber ? String(m.phoneNumber).slice(0, 30) : null,
         is_head_of_household: m.isHeadOfHousehold === true,
       }))

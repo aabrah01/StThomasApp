@@ -258,7 +258,7 @@ export async function POST(request: Request) {
         first_name: first.slice(0, 50),
         last_name: last.slice(0, 50),
         alias: row.Alias?.trim() || null,
-        email: row.Email?.trim() || null,
+        email: row.Email?.trim().toLowerCase() || null,
         phone_number: row.CellPhone?.trim() || null,
         is_active: row.MemStatus === 'Active',
         role,
