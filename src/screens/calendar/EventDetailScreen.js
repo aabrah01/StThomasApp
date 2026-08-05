@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   useWindowDimensions,
+  Linking,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
@@ -36,6 +38,16 @@ const EventDetailScreen = ({ route, navigation }) => {
     const h = hours % 12 || 12;
     const m = String(minutes).padStart(2, '0');
     return `${h}:${m} ${ampm}`;
+  };
+
+  const openLocation = () => {
+    const query = encodeURIComponent(event.location);
+    const url = Platform.select({
+      ios: `https://maps.apple.com/?q=${query}`,
+      android: `https://www.google.com/maps/search/?api=1&query=${query}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${query}`,
+    });
+    Linking.openURL(url);
   };
 
   const formatDuration = () => {
@@ -108,15 +120,15 @@ const EventDetailScreen = ({ route, navigation }) => {
           {event.location ? (
             <>
               <View style={styles.separator} />
-              <View style={styles.infoRow}>
+              <TouchableOpacity style={styles.infoRow} onPress={openLocation}>
                 <View style={styles.iconWrap}>
                   <Ionicons name="location-outline" size={20} color={theme.colors.sapphire} />
                 </View>
                 <View style={styles.infoText}>
                   <Text style={styles.infoLabel}>Location</Text>
-                  <Text style={styles.infoValueLocation}>{event.location}</Text>
+                  <Text style={[styles.infoValueLocation, styles.infoValueLink]}>{event.location}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             </>
           ) : null}
         </View>
@@ -241,6 +253,9 @@ const makeStyles = (theme) => StyleSheet.create({
     fontSize: theme.fonts.sizes.md,
     color: theme.colors.sapphire,
     fontWeight: '500',
+  },
+  infoValueLink: {
+    textDecorationLine: 'underline',
   },
   separator: {
     height: 1,

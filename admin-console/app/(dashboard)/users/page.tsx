@@ -17,7 +17,7 @@ export default async function UsersPage() {
   } else {
     const supabase = createAdminSupabase();
     const [{ data: { users } }, { data: roles }, { data: members }] = await Promise.all([
-      supabase.auth.admin.listUsers(),
+      supabase.auth.admin.listUsers({ perPage: 1000 }),
       supabase.from('user_roles').select('*'),
       supabase.from('members').select('id, first_name, last_name, email, is_head_of_household'),
     ]);
