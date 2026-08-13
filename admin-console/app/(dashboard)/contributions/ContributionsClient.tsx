@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import * as XLSX from 'xlsx';
+import { parseContributionWorkbook, type ContributionRow as CsvRow } from '@/lib/parseContributionSheet';
 
 interface Contribution {
   id: string;
@@ -14,15 +14,6 @@ interface Contribution {
   fiscalYear: number;
 }
 
-interface CsvRow {
-  familyName?: string;
-  membershipId?: string;
-  date: string;
-  amount: string;
-  category: string;
-  sourceRow?: number;
-}
-
 interface CategoryAmount {
   category: string;
   requestedAmount: number;
@@ -33,15 +24,30 @@ interface StatementSettings {
   closingParagraph: string;
 }
 
+export interface LastImport {
+  trigger: 'scheduled' | 'manual' | 'upload';
+  status: 'imported' | 'aborted' | 'failed';
+  actor: string | null;
+  file_name: string | null;
+  row_count: number | null;
+  unmatched_count: number | null;
+  member_entries: number | null;
+  member_entries_matched: number | null;
+  message: string | null;
+  created_at: string;
+}
+
 interface Props {
   contributions: Contribution[];
   families: { id: string; name: string; membershipId: string }[];
   categories: string[];
   initialCategoryAmounts: CategoryAmount[];
   initialStatementSettings: StatementSettings;
+  initialDriveSettings: { folderId: string; reportRecipients: string };
+  initialLastImport: LastImport | null;
 }
 
-export default function ContributionsClient({ contributions: initial, families, categories, initialCategoryAmounts, initialStatementSettings }: Props) {
+export default function ContributionsClient({ contributions: initial, families, categories, initialCategoryAmounts, initialStatementSettings, initialDriveSettings, initialLastImport }: Props) {
   const [contribs, setContribs] = useState(initial);
   const [panel, setPanel] = useState<null | 'manual'>(null);
 
@@ -105,7 +111,70 @@ export default function ContributionsClient({ contributions: initial, families, 
   const [importResult, setImportResult] = useState('');
   const [importRowErrors, setImportRowErrors] = useState<{ row: number; reason: string; identifier: string }[]>([]);
   const [parseError, setParseError] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState('');
   const [importDate, setImportDate] = useState(() => new Date().toISOString().slice(0, 10));
+
+  // Scheduled Drive import state
+  const [folderInput, setFolderInput] = useState(initialDriveSettings.folderId);
+  const [savedFolder, setSavedFolder] = useState(initialDriveSettings.folderId);
+  const [recipientsInput, setRecipientsInput] = useState(initialDriveSettings.reportRecipients);
+  const [savedRecipients, setSavedRecipients] = useState(initialDriveSettings.reportRecipients);
+  const [savingDrive, setSavingDrive] = useState(false);
+  const [driveError, setDriveError] = useState('');
+  const [lastImport, setLastImport] = useState<LastImport | null>(initialLastImport);
+  const [runningImport, setRunningImport] = useState(false);
+  const [driveResult, setDriveResult] = useState('');
+
+  const handleSaveDriveSettings = async () => {
+    setSavingDrive(true);
+    setDriveError('');
+    const res = await fetch('/api/settings/import', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderId: folderInput, reportRecipients: recipientsInput }),
+    });
+    const json = await res.json();
+    if (res.ok) {
+      setSavedFolder(json.folderId);
+      setSavedRecipients(json.reportRecipients);
+      setFolderInput(json.folderId);
+    } else {
+      setDriveError(json.error ?? 'Failed to save settings');
+    }
+    setSavingDrive(false);
+  };
+
+  const handleImportNow = async (reimport = false) => {
+    setRunningImport(true);
+    setDriveResult('');
+    const res = await fetch('/api/contributions/import-from-drive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reimport }),
+    });
+    const json = await res.json();
+
+    // Messages are phrased so the treasurer knows what to do next, not just what happened.
+    const messages: Record<string, string> = {
+      not_configured: 'No Drive folder configured yet.',
+      no_file: 'No new export found in the Drive folder.',
+      unchanged: 'That file has already been imported — use Re-import last file to run it again.',
+      workbook_open: 'The workbook is currently open in Excel. Close it and try again.',
+      nothing_to_reimport: 'No previous import to re-run.',
+    };
+
+    if (json.status === 'imported') {
+      setDriveResult(`Imported ${json.rowCount} rows from ${json.fileName}.`);
+      // Refresh the banner and the table without a full reload.
+      const refreshed = await fetch('/api/settings/import');
+      if (refreshed.ok) setLastImport((await refreshed.json()).lastImport);
+    } else if (json.status === 'skipped') {
+      setDriveResult(messages[json.reason] ?? 'Nothing to import.');
+    } else {
+      setDriveResult(json.message ?? 'Import failed.');
+    }
+    setRunningImport(false);
+  };
 
   // Manual entry state
   const [manualFamilyId, setManualFamilyId] = useState('');
@@ -156,65 +225,13 @@ export default function ContributionsClient({ contributions: initial, families, 
     const isExcel = /\.(xlsx|xls)$/i.test(file.name);
     const reader = new FileReader();
     setParseError('');
+    setUploadedFileName(file.name);
 
     if (isExcel) {
       reader.onload = ev => {
         const data = new Uint8Array(ev.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        // QuickBooks exports include a "tips" sheet first — pick the sheet with the most rows
-        const sheetName = workbook.SheetNames.reduce((best, name) => {
-          const s = workbook.Sheets[name];
-          const ref = s['!ref'];
-          if (!ref) return best;
-          const rows = XLSX.utils.decode_range(ref).e.r;
-          const bestRows = workbook.Sheets[best]['!ref']
-            ? XLSX.utils.decode_range(workbook.Sheets[best]['!ref']!).e.r
-            : 0;
-          return rows > bestRows ? name : best;
-        }, workbook.SheetNames[0]);
-        const sheet = workbook.Sheets[sheetName];
-
-        const raw = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1, defval: '' });
-        if (raw.length < 3) {
-          setParseError('File must have at least 3 rows (group header, column header, data).');
-          return;
-        }
-
-        const groupHeaders = (raw[0] as (string | number)[]).map(h => String(h ?? '').trim());
-        const headers      = (raw[1] as (string | number)[]).map(h => String(h ?? '').trim());
-
-        const catCols: { idx: number; name: string }[] = [];
-        for (let i = 3; i < headers.length; i++) {
-          const h = headers[i];
-          if (/^total income$/i.test(h)) break;
-          if (!h || /^total/i.test(h)) continue;
-          const isSubAccount = /^\(.*\)$/.test(h);
-          const name = isSubAccount
-            ? (groupHeaders[i] || h.slice(1, -1)).trim()
-            : h;
-          catCols.push({ idx: i, name });
-        }
-
-        const rows: CsvRow[] = [];
-        for (let r = 2; r < raw.length - 1; r++) {
-          const row = raw[r] as (string | number)[];
-          const nameCell = String(row[1] ?? '').trim();
-          if (!nameCell || /^total/i.test(nameCell)) continue;
-
-          const idMatch = nameCell.match(/\s*-+\s*(\d+)\s*$/);
-          const membershipId = idMatch ? idMatch[1] : undefined;
-          const familyName = (idMatch ? nameCell.slice(0, idMatch.index) : nameCell).replace(/[-\s]+$/, '').trim();
-
-          for (const { idx, name } of catCols) {
-            const raw_val = row[idx];
-            const amount = parseFloat(String(raw_val ?? '0').replace(/[$,]/g, ''));
-            if (amount > 0) {
-              rows.push({ membershipId, familyName, date: importDate, amount: String(amount), category: name, sourceRow: r + 1 });
-            }
-          }
-        }
-        if (rows.length === 0) setParseError('No valid rows found. Check that the file matches the expected QuickBooks export format.');
-        else setParseError('');
+        const { rows, error } = parseContributionWorkbook(data, importDate);
+        setParseError(error ?? '');
         setCsvRows(rows);
       };
       reader.readAsArrayBuffer(file);
@@ -242,7 +259,7 @@ export default function ContributionsClient({ contributions: initial, families, 
     const res = await fetch('/api/contributions/import', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows: csvRows, asofDate: importDate }),
+      body: JSON.stringify({ rows: csvRows, asofDate: importDate, fileName: uploadedFileName }),
     });
     const json = await res.json();
     if (res.ok) {
@@ -294,7 +311,7 @@ export default function ContributionsClient({ contributions: initial, families, 
       {/* Import panel */}
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">Import Contributions</h2>
+            <h2 className="font-semibold text-gray-900">Manual Import</h2>
           </div>
           <p className="text-sm text-gray-500">
             Supports Excel (.xlsx) summary exports (one row per family, categories as columns).
@@ -373,6 +390,110 @@ export default function ContributionsClient({ contributions: initial, families, 
             </div>
           )}
         </div>
+
+      {/* Scheduled import panel — nightly Drive scan, plus a manual trigger */}
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 space-y-4">
+        <div>
+          <h2 className="font-semibold text-gray-900">Scheduled Import from Google Drive</h2>
+          <p className="text-sm text-gray-500">
+            Each night the newest .xlsx export in this Drive folder is imported automatically, then moved
+            to an <span className="font-mono text-xs">Imported</span> subfolder. Files that fail a check
+            go to <span className="font-mono text-xs">Failed</span> instead, and the contributions already
+            stored are left untouched.
+          </p>
+        </div>
+
+        {lastImport && (
+          <div className={`rounded-lg border p-3 ${
+            lastImport.status === 'imported'
+              ? 'border-green-200 bg-green-50'
+              : 'border-red-200 bg-red-50'
+          }`}>
+            <p className={`text-sm font-medium ${lastImport.status === 'imported' ? 'text-green-700' : 'text-red-700'}`}>
+              {lastImport.status === 'imported'
+                ? `Last import: ${new Date(lastImport.created_at).toLocaleDateString()} — ${lastImport.row_count} rows`
+                : `${lastImport.status === 'aborted' ? 'ABORTED' : 'FAILED'} ${new Date(lastImport.created_at).toLocaleDateString()}`}
+              <span className="font-normal text-xs ml-2">
+                ({lastImport.trigger === 'upload' ? 'uploaded' : lastImport.trigger}
+                {lastImport.actor && lastImport.actor !== 'cron' ? ' by an admin' : ''})
+              </span>
+            </p>
+            {lastImport.message && (
+              <p className="text-xs text-red-700 mt-1">{lastImport.message}</p>
+            )}
+            {lastImport.status === 'imported' && lastImport.member_entries ? (
+              <p className="text-xs text-gray-600 mt-1">
+                {lastImport.member_entries_matched} of {lastImport.member_entries} member entries matched
+                {lastImport.unmatched_count ? ` · ${lastImport.unmatched_count} unmatched entries` : ''}
+              </p>
+            ) : null}
+          </div>
+        )}
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-gray-700">Drive folder</label>
+          <p className="text-xs text-gray-500">
+            Paste the folder link. It must be shared with the import service account — not
+            &ldquo;anyone with the link.&rdquo;
+          </p>
+          <input
+            type="text"
+            value={folderInput}
+            onChange={e => setFolderInput(e.target.value)}
+            placeholder="https://drive.google.com/drive/folders/…"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#7E282F]/30"
+          />
+          {savedFolder && (
+            <p className="text-xs text-gray-500">Current folder ID: <span className="font-mono">{savedFolder}</span></p>
+          )}
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-gray-700">Report recipients</label>
+          <p className="text-xs text-gray-500">Comma-separated. Emailed after every import, scheduled or manual.</p>
+          <input
+            type="text"
+            value={recipientsInput}
+            onChange={e => setRecipientsInput(e.target.value)}
+            placeholder="treasurer@example.org, admin@example.org"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#7E282F]/30"
+          />
+          {!savedRecipients && (
+            <p className="text-xs text-amber-700">
+              No recipients set — imports will run, but no report will be emailed.
+            </p>
+          )}
+        </div>
+
+        {driveError && <p className="text-sm text-red-600">{driveError}</p>}
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSaveDriveSettings}
+            disabled={savingDrive || (folderInput === savedFolder && recipientsInput === savedRecipients)}
+            className="text-sm font-semibold px-5 py-2 rounded-lg bg-[#7E282F] text-white hover:bg-[#6a2228] transition-colors disabled:opacity-50"
+          >
+            {savingDrive ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            onClick={() => handleImportNow(false)}
+            disabled={runningImport || !savedFolder}
+            title={!savedFolder ? 'Save a Drive folder first' : undefined}
+            className="text-sm font-semibold px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            {runningImport ? 'Importing…' : 'Import now'}
+          </button>
+          <button
+            onClick={() => handleImportNow(true)}
+            disabled={runningImport || !savedFolder || !lastImport}
+            title="Run the last imported file again — use after correcting family records"
+            className="text-sm text-gray-500 underline underline-offset-2 hover:text-gray-700 disabled:opacity-50 disabled:no-underline"
+          >
+            Re-import last file
+          </button>
+          {driveResult && <span className="text-sm text-gray-600">{driveResult}</span>}
+        </div>
+      </div>
 
       {/* Requested Amounts panel — per-category pledge targets shown on generated statements */}
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 space-y-4">

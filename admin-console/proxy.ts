@@ -32,6 +32,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // ── Cron routes: authenticate on CRON_SECRET, not a cookie session ──────────
+  // Vercel Cron sends only an Authorization header, so the gate below would
+  // redirect it to /login and the job would silently never run.
+  if (pathname.startsWith('/api/cron/')) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
