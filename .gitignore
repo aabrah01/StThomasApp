@@ -53,3 +53,6 @@ prod_data.sql
 .supabase/
 # CLI scratch: linked project ref and cached remote version strings
 supabase/.temp/
+
+# Local docs / tools
+docs/
