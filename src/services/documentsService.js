@@ -35,6 +35,11 @@ class DocumentsService {
         fields: 'files(id,name,modifiedTime)',
         orderBy: 'name',
         pageSize: 100,
+        // Required when the folder lives on a Shared Drive. Without these the
+        // API returns an empty file list and no error, which looks identical to
+        // an empty folder.
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
       };
 
       const response = await axios.get(`${this.baseUrl}/files`, { params });
@@ -64,7 +69,7 @@ class DocumentsService {
 
       const safeName = `${name.replace(/[^a-z0-9]+/gi, '_')}.pdf`;
       const target = `${FileSystem.cacheDirectory}${safeName}`;
-      const url = `${this.baseUrl}/files/${fileId}?alt=media&key=${this.apiKey}`;
+      const url = `${this.baseUrl}/files/${fileId}?alt=media&supportsAllDrives=true&key=${this.apiKey}`;
 
       const { uri } = await FileSystem.downloadAsync(url, target);
       return { uri, error: null };

@@ -9,9 +9,10 @@ jest.mock('@/lib/requireAdmin', () => ({
 }));
 
 const mockFrom = jest.fn();
+const mockRpc = jest.fn();
 
 jest.mock('@/lib/supabase', () => ({
-  createAdminSupabase: () => ({ from: mockFrom }),
+  createAdminSupabase: () => ({ from: mockFrom, rpc: mockRpc }),
 }));
 
 import { POST } from '@/app/api/contributions/import/route';
@@ -31,17 +32,16 @@ const makeRequest = (body: unknown, headers: Record<string, string> = {}) =>
 beforeEach(() => {
   jest.clearAllMocks();
 
+  mockRpc.mockResolvedValue({ data: 1, error: null });
+
   mockFrom.mockImplementation((table: string) => {
     if (table === 'families') {
       return { select: () => Promise.resolve({ data: FAMILIES, error: null }) };
     }
-    if (table === 'contributions') {
-      return {
-        delete: () => ({ neq: () => Promise.resolve({ error: null }) }),
-        insert: () => Promise.resolve({ data: null, error: null }),
-      };
-    }
-    return { insert: () => Promise.resolve({ data: null, error: null }) };
+    return {
+      insert: () => Promise.resolve({ data: null, error: null }),
+      upsert: () => Promise.resolve({ data: null, error: null }),
+    };
   });
 });
 
@@ -125,68 +125,25 @@ describe('POST /api/contributions/import', () => {
     expect(json.count).toBe(1);
   });
 
-  it('deletes all existing contributions before inserting (full replace)', async () => {
-    const deleteMock = jest.fn().mockReturnValue({ neq: jest.fn().mockResolvedValue({ error: null }) });
-    const insertMock = jest.fn().mockResolvedValue({ data: null, error: null });
-
-    mockFrom.mockImplementation((table: string) => {
-      if (table === 'families') {
-        return { select: () => Promise.resolve({ data: FAMILIES, error: null }) };
-      }
-      if (table === 'contributions') {
-        return { delete: deleteMock, insert: insertMock };
-      }
-      return { insert: () => Promise.resolve({ data: null, error: null }) };
-    });
-
+  it('replaces contributions through the atomic RPC, not delete + insert', async () => {
     const rows = [
       { familyName: 'Smith Family', date: '2024-01-15', amount: '100', category: 'General' },
     ];
     const res = await POST(makeRequest({ rows }));
     expect(res.status).toBe(200);
-    expect(deleteMock).toHaveBeenCalled();
-    expect(insertMock).toHaveBeenCalled();
+    expect(mockRpc).toHaveBeenCalledWith('replace_contributions', {
+      rows: [{ family_id: 'fam-1', date: '2024-01-15', amount: 100, category: 'General' }],
+    });
   });
 
-  it('returns 500 when the delete-all step fails', async () => {
-    mockFrom.mockImplementation((table: string) => {
-      if (table === 'families') {
-        return { select: () => Promise.resolve({ data: FAMILIES, error: null }) };
-      }
-      if (table === 'contributions') {
-        return { delete: () => ({ neq: () => Promise.resolve({ error: { message: 'DB error' } }) }) };
-      }
-      return { insert: () => Promise.resolve({ data: null, error: null }) };
-    });
+  it('returns 500 when the replace RPC fails', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'DB error' } });
 
     const rows = [
       { familyName: 'Smith Family', date: '2024-01-15', amount: '100', category: 'General' },
     ];
     const res = await POST(makeRequest({ rows }));
     expect(res.status).toBe(500);
-    const json = await res.json();
-    expect(json.error).toMatch(/clear/i);
-  });
-
-  it('returns 400 when DB insert fails', async () => {
-    mockFrom.mockImplementation((table: string) => {
-      if (table === 'families') {
-        return { select: () => Promise.resolve({ data: FAMILIES, error: null }) };
-      }
-      if (table === 'contributions') {
-        return {
-          delete: () => ({ neq: () => Promise.resolve({ error: null }) }),
-          insert: () => Promise.resolve({ data: null, error: { message: 'DB error' } }),
-        };
-      }
-      return { insert: () => Promise.resolve({ data: null, error: null }) };
-    });
-
-    const rows = [
-      { familyName: 'Smith Family', date: '2024-01-15', amount: '100', category: 'General' },
-    ];
-    const res = await POST(makeRequest({ rows }));
-    expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.error).toBe('Import failed');
   });

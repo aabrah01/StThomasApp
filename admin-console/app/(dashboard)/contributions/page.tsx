@@ -1,6 +1,6 @@
 import { createAdminSupabase } from '@/lib/supabase';
 import { DEMO_CONTRIBUTIONS, DEMO_FAMILIES } from '@/lib/demoData';
-import ContributionsClient from './ContributionsClient';
+import ContributionsClient, { type LastImport } from './ContributionsClient';
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
@@ -12,6 +12,8 @@ export default async function ContributionsPage() {
   let categories: string[];
   let categoryAmounts: { category: string; requestedAmount: number }[];
   let statementSettings: { introParagraph: string; closingParagraph: string };
+  let driveSettings: { folderId: string; reportRecipients: string };
+  let lastImport: LastImport | null;
 
   if (DEMO_MODE) {
     const familyById = new Map(DEMO_FAMILIES.map(f => [f.id, f]));
@@ -20,14 +22,23 @@ export default async function ContributionsPage() {
     categories = Array.from(new Set(DEMO_CONTRIBUTIONS.map(c => c.category))).sort();
     categoryAmounts = [];
     statementSettings = { introParagraph: '', closingParagraph: '' };
+    driveSettings = { folderId: '', reportRecipients: '' };
+    lastImport = null;
   } else {
     const supabase = createAdminSupabase();
-    const [{ data: contributions }, { data: families }, { data: allCategories }, { data: amounts }, { data: settings }] = await Promise.all([
+    const [{ data: contributions }, { data: families }, { data: allCategories }, { data: amounts }, { data: settings }, { data: importSettings }, { data: lastImportRow }] = await Promise.all([
       supabase.from('contributions').select('*, families(family_name, membership_id)').order('date', { ascending: false }).limit(200),
       supabase.from('families').select('id, family_name, membership_id').order('family_name'),
       supabase.from('contributions').select('category'),
       supabase.from('contribution_category_amounts').select('category, requested_amount').order('category'),
       supabase.from('contribution_settings').select('intro_paragraph, closing_paragraph').eq('id', 1).single(),
+      supabase.from('import_settings').select('folder_id, report_recipients').eq('id', 'contributions').maybeSingle(),
+      supabase
+        .from('contribution_imports')
+        .select('trigger, status, actor, file_name, row_count, unmatched_count, member_entries, member_entries_matched, message, created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
     contribs = (contributions ?? []).map(c => ({
       id: c.id, familyId: c.family_id,
@@ -42,6 +53,11 @@ export default async function ContributionsPage() {
       introParagraph: settings?.intro_paragraph ?? '',
       closingParagraph: settings?.closing_paragraph ?? '',
     };
+    driveSettings = {
+      folderId: importSettings?.folder_id ?? '',
+      reportRecipients: importSettings?.report_recipients ?? '',
+    };
+    lastImport = (lastImportRow as LastImport | null) ?? null;
   }
 
   return (
@@ -58,6 +74,8 @@ export default async function ContributionsPage() {
         categories={categories}
         initialCategoryAmounts={categoryAmounts}
         initialStatementSettings={statementSettings}
+        initialDriveSettings={driveSettings}
+        initialLastImport={lastImport}
       />
     </div>
   );
