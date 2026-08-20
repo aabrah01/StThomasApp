@@ -1,6 +1,9 @@
 import { createAdminSupabase } from '@/lib/supabase';
 import { DEMO_FAMILIES, DEMO_MEMBERS, DEMO_CONTRIBUTIONS } from '@/lib/demoData';
 import FeaturesSection from './FeaturesSection';
+import ContactsSection, { type ChurchContact } from './ContactsSection';
+
+const CONTACT_ROLES = ['vicar', 'secretary', 'treasurer'];
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
@@ -12,6 +15,9 @@ export default async function DashboardPage() {
   let enableFlowerSignup = false;
   let enableDocuments = false;
   let assemblyDocsFolderId = '';
+  let contacts: ChurchContact[] = CONTACT_ROLES.map(role => ({
+    role, name: '', phone: '', email: '',
+  }));
 
   if (DEMO_MODE) {
     familyCount = DEMO_FAMILIES.length;
@@ -20,12 +26,13 @@ export default async function DashboardPage() {
     appUserCount = 3;
   } else {
     const supabase = createAdminSupabase();
-    const [fc, mc, cc, uc, settings] = await Promise.all([
+    const [fc, mc, cc, uc, settings, contactRows] = await Promise.all([
       supabase.from('families').select('*', { count: 'exact', head: true }),
       supabase.from('members').select('*', { count: 'exact', head: true }),
       supabase.from('contributions').select('*', { count: 'exact', head: true }),
       supabase.from('member_users').select('*', { count: 'exact', head: true }),
       supabase.from('app_settings').select('enable_meal_signup, enable_flower_signup, enable_documents, assembly_docs_folder_id').eq('id', 'config').single(),
+      supabase.from('church_contacts').select('role, name, phone, email').order('display_order'),
     ]);
     familyCount = fc.count ?? 0;
     memberCount = mc.count ?? 0;
@@ -35,6 +42,15 @@ export default async function DashboardPage() {
     enableFlowerSignup = settings.data?.enable_flower_signup ?? false;
     enableDocuments = settings.data?.enable_documents ?? false;
     assemblyDocsFolderId = settings.data?.assembly_docs_folder_id ?? '';
+
+    // Seeded rows may be missing if the migration hasn't run — fall back to blanks
+    const byRole = new Map((contactRows.data ?? []).map(r => [r.role, r]));
+    contacts = CONTACT_ROLES.map(role => ({
+      role,
+      name: byRole.get(role)?.name ?? '',
+      phone: byRole.get(role)?.phone ?? '',
+      email: byRole.get(role)?.email ?? '',
+    }));
   }
 
   const stats = [
@@ -78,6 +94,8 @@ export default async function DashboardPage() {
         initialEnableDocuments={enableDocuments}
         initialAssemblyDocsFolderId={assemblyDocsFolderId}
       />
+
+      <ContactsSection initialContacts={contacts} />
     </div>
   );
 }

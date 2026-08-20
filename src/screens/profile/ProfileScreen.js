@@ -18,13 +18,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import databaseService from '../../services/databaseService';
 import storageService from '../../services/storageService';
-import { generateAndShareStatement } from '../../services/statementService';
 import Avatar from '../../components/common/Avatar';
 import CropModal from '../../components/common/CropModal';
+import ScreenHeader from '../../components/common/ScreenHeader';
 import { useTheme } from '../../hooks/useTheme';
 import { useCommonStyles } from '../../styles/commonStyles';
 import * as Application from 'expo-application';
-import * as Clipboard from 'expo-clipboard';
 
 const ProfileScreen = ({ navigation }) => {
   const theme = useTheme();
@@ -32,16 +31,10 @@ const ProfileScreen = ({ navigation }) => {
   const commonStyles = useCommonStyles();
   const { user, member, userRole, signOut, isAdmin } = useAuth();
   const [family, setFamily] = useState(null);
-  const [contributions, setContributions] = useState([]);
-  const [categoryAmounts, setCategoryAmounts] = useState({});
   const [loading, setLoading] = useState(true);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [cropModalVisible, setCropModalVisible] = useState(false);
   const [pendingImageUri, setPendingImageUri] = useState(null);
-
-  const [givingYear, setGivingYear] = useState(new Date().getFullYear());
-  const [asofLabel, setAsofLabel] = useState('');
-  const [generatingStatement, setGeneratingStatement] = useState(false);
   const { markScreenReady } = useDataReady();
   const { refreshKey } = useAppRefresh();
 
@@ -61,33 +54,9 @@ const ProfileScreen = ({ navigation }) => {
   }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadFamilyData = async () => {
-    const settingsResult = await databaseService.getContributionSettings();
-    const asofDate = settingsResult?.asofDate ?? new Date().toISOString().slice(0, 10);
-    const asofObj = new Date(asofDate + 'T00:00:00');
-    const year = asofObj.getFullYear();
-    const mm = String(asofObj.getMonth() + 1).padStart(2, '0');
-    const dd = String(asofObj.getDate()).padStart(2, '0');
-    setGivingYear(year);
-    setAsofLabel(`${mm}-${dd}-${year}`);
-
-    const promises = [];
     if (member?.familyId) {
-      promises.push(
-        databaseService.getFamilyById(member.familyId),
-        databaseService.getContributions(member.familyId, year),
-        databaseService.getContributionCategoryAmounts(),
-      );
-    }
-    const [familyResult, contribResult, categoryAmountsResult] = await Promise.all(promises);
-    if (familyResult?.data) setFamily(familyResult.data);
-    if (contribResult?.data) setContributions(contribResult.data);
-    if (categoryAmountsResult?.data) {
-      setCategoryAmounts(
-        categoryAmountsResult.data.reduce((acc, a) => {
-          acc[a.category] = a.requestedAmount;
-          return acc;
-        }, {})
-      );
+      const { data } = await databaseService.getFamilyById(member.familyId);
+      if (data) setFamily(data);
     }
     setLoading(false);
     markScreenReady('profile');
@@ -178,25 +147,9 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
-  const handleZelle = async () => {
-    await Clipboard.setStringAsync('donate@stthomasli.org');
-    Alert.alert('Copied', 'Zelle email copied to clipboard.');
-  };
-
-  const handleGenerateStatement = async () => {
-    if (!member?.familyId || generatingStatement) return;
-    setGeneratingStatement(true);
-    try {
-      await generateAndShareStatement(member.familyId);
-    } catch (e) {
-      Alert.alert('Could not generate statement', e.message || 'Please try again.');
-    } finally {
-      setGeneratingStatement(false);
-    }
-  };
-
   return (
-    <>
+    <View style={commonStyles.container}>
+      <ScreenHeader title="My Profile" onBack={() => navigation.goBack()} />
     <ScrollView style={commonStyles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View style={styles.avatarWrapper}>
@@ -285,86 +238,6 @@ const ProfileScreen = ({ navigation }) => {
         )}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Donate</Text>
-          <TouchableOpacity
-            style={[styles.row, styles.lastRow]}
-            onPress={handleZelle}
-          >
-            <View style={styles.iconBox}>
-              <Text style={styles.rowIcon}>❤️</Text>
-            </View>
-            <View style={styles.rowContent}>
-              <Text style={styles.rowLabel}>Give via Zelle</Text>
-              <Text style={styles.rowValue}>donate@stthomasli.org</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.textLight} />
-          </TouchableOpacity>
-        </View>
-
-        {member?.isHeadOfHousehold && contributions.length > 0 && (() => {
-          const ytdTotal = contributions.reduce((sum, c) => sum + c.amount, 0);
-          // Group by category — categories come directly from QuickBooks
-          const byCategory = contributions.reduce((acc, c) => {
-            acc[c.category] = (acc[c.category] || 0) + c.amount;
-            return acc;
-          }, {});
-          const sortedCategories = Object.entries(byCategory).sort(
-            ([a], [b]) => (categoryAmounts[b] ?? -1) - (categoryAmounts[a] ?? -1) || a.localeCompare(b)
-          );
-          return (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{givingYear} YTD Giving As Of {asofLabel}</Text>
-
-              {/* Total rollup */}
-              <View style={styles.row}>
-                <View style={[styles.iconBox, styles.givingIconBox]}>
-                  <Ionicons name="heart-outline" size={18} color={theme.colors.sapphire} />
-                </View>
-                <View style={styles.rowContent}>
-                  <Text style={styles.rowLabel}>Total Contributions</Text>
-                  <Text style={[styles.rowValue, styles.ytdAmount]}>
-                    ${ytdTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={handleGenerateStatement}
-                  disabled={generatingStatement}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  {generatingStatement
-                    ? <ActivityIndicator size="small" color={theme.colors.sapphire} />
-                    : <Ionicons name="print-outline" size={22} color={theme.colors.sapphire} />}
-                </TouchableOpacity>
-              </View>
-
-              {/* Category breakdown — indented under total, sorted by requested amount */}
-              {sortedCategories.map(([category, amount], index) => (
-                <View
-                  key={category}
-                  style={[
-                    styles.row,
-                    styles.categoryRow,
-                    index === sortedCategories.length - 1 && styles.lastRow,
-                  ]}
-                >
-                  <View style={[styles.iconBox, styles.givingIconBox]}>
-                    <Ionicons name="pricetag-outline" size={14} color={theme.colors.textLight} />
-                  </View>
-                  <View style={[styles.rowContent, styles.categoryInline]}>
-                    <Text style={[styles.rowValue, styles.categoryName]} numberOfLines={1}>{category}</Text>
-                    <Text style={[styles.rowValue, styles.categoryAmount]}>
-                      ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                      {categoryAmounts[category] != null &&
-                        ` of $${categoryAmounts[category].toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          );
-        })()}
-
-        <View style={styles.section}>
           <Text style={styles.sectionTitle}>App</Text>
           <View style={[styles.row, styles.lastRow]}>
             <View style={styles.iconBox}>
@@ -393,7 +266,7 @@ const ProfileScreen = ({ navigation }) => {
       }}
       onCancel={() => setCropModalVisible(false)}
     />
-    </>
+    </View>
   );
 };
 
@@ -503,32 +376,6 @@ const makeStyles = (theme) => StyleSheet.create({
   chevron: {
     fontSize: 22,
     color: theme.colors.textLight,
-  },
-  givingIconBox: {
-    backgroundColor: theme.colors.surfaceSecondary,
-  },
-  ytdAmount: {
-    color: theme.colors.sapphire,
-    fontWeight: '700',
-    fontSize: theme.fonts.sizes.lg,
-  },
-  categoryRow: {
-    paddingLeft: theme.spacing.lg,
-  },
-  categoryInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  categoryName: {
-    flex: 1,
-    fontSize: theme.fonts.sizes.sm,
-    color: theme.colors.textSecondary,
-  },
-  categoryAmount: {
-    fontSize: theme.fonts.sizes.sm,
-    color: theme.colors.textSecondary,
-    marginLeft: theme.spacing.sm,
   },
   familyPhotoThumb: {
     width: 36,

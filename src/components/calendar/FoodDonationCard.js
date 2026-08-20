@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import databaseService from '../../services/databaseService';
 
 
-const FoodDonationCard = React.memo(({ eventDate, onSignupChange, refreshKey }) => {
+const FoodDonationCard = React.memo(({ eventDate, eventId, onSignupChange, refreshKey }) => {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { member, isAdmin } = useAuth();
@@ -20,8 +20,8 @@ const FoodDonationCard = React.memo(({ eventDate, onSignupChange, refreshKey }) 
   const load = useCallback(async () => {
     setError('');
     const [countResult, signupsResult] = await Promise.all([
-      databaseService.getMealSignupCount(eventDate),
-      databaseService.getMealSignups(eventDate),
+      databaseService.getMealSignupCount(eventId),
+      databaseService.getMealSignups(eventId),
     ]);
     if (countResult.error) {
       setError(countResult.error);
@@ -30,7 +30,7 @@ const FoodDonationCard = React.memo(({ eventDate, onSignupChange, refreshKey }) 
     }
     if (signupsResult.data) setSignups(signupsResult.data);
     setLoading(false);
-  }, [eventDate]);
+  }, [eventId]);
 
   useEffect(() => {
     setLoading(true);
@@ -49,7 +49,7 @@ const FoodDonationCard = React.memo(({ eventDate, onSignupChange, refreshKey }) 
   const handlePledge = async () => {
     if (!member?.id) return;
     setActionLoading(true);
-    const { error: err } = await databaseService.createMealSignup(member.id, eventDate);
+    const { error: err } = await databaseService.createMealSignup(member.id, eventDate, eventId);
     if (err) {
       setError(err);
     } else {
@@ -77,7 +77,9 @@ const FoodDonationCard = React.memo(({ eventDate, onSignupChange, refreshKey }) 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Ionicons name="restaurant" size={17} color="#FFFFFF" style={styles.headerIcon} />
+        <View style={styles.headerIconBox}>
+          <Ionicons name="restaurant-outline" size={16} color={theme.colors.accent} />
+        </View>
         <Text style={styles.headerText}>Food Donation</Text>
       </View>
 
@@ -160,33 +162,43 @@ const FoodDonationCard = React.memo(({ eventDate, onSignupChange, refreshKey }) 
 });
 
 const makeStyles = (theme) => StyleSheet.create({
+  // Rendered inside the expanded date card on the Sign-Ups screen, so the
+  // surface, corners and shadow come from that parent. A hairline separates
+  // this section from the row above it.
   card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
-    marginBottom: theme.spacing.sm,
-    overflow: 'hidden',
-    ...theme.shadows.sm,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.sapphire,
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.xs,
   },
-  headerIcon: {
+  headerIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: theme.colors.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: theme.spacing.sm,
   },
   headerText: {
-    color: '#FFFFFF',
+    fontSize: theme.fonts.sizes.xs,
     fontWeight: '700',
-    fontSize: theme.fonts.sizes.md,
+    color: theme.colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   loader: {
     paddingVertical: theme.spacing.md,
   },
   body: {
-    padding: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+    paddingTop: theme.spacing.xs,
   },
   countText: {
     fontSize: theme.fonts.sizes.md,

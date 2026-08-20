@@ -22,6 +22,7 @@ import MemberList from '../../components/directory/MemberList';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import CropModal from '../../components/common/CropModal';
+import ImageViewerModal from '../../components/common/ImageViewerModal';
 import { useTheme } from '../../hooks/useTheme';
 import { useCommonStyles } from '../../styles/commonStyles';
 
@@ -47,6 +48,7 @@ const FamilyDetailScreen = ({ route, navigation }) => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [cropModalVisible, setCropModalVisible] = useState(false);
   const [pendingImageUri, setPendingImageUri] = useState(null);
+  const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -219,7 +221,15 @@ const FamilyDetailScreen = ({ route, navigation }) => {
       <View style={[styles.photoWrapper, { aspectRatio: photoAspectRatio }]}>
         <View style={styles.photoArea}>
           {family.photoUrl ? (
-            <Image source={{ uri: family.photoUrl }} style={styles.photo} />
+            <TouchableOpacity
+              style={styles.photo}
+              onPress={() => setPhotoViewerVisible(true)}
+              activeOpacity={0.9}
+              accessibilityRole="imagebutton"
+              accessibilityLabel="View family photo full screen"
+            >
+              <Image source={{ uri: family.photoUrl }} style={styles.photo} />
+            </TouchableOpacity>
           ) : (
             <View style={styles.photoPlaceholder}>
               <Text style={styles.initials}>{initials}</Text>
@@ -340,6 +350,11 @@ const FamilyDetailScreen = ({ route, navigation }) => {
         uploadPhoto(uri);
       }}
       onCancel={() => setCropModalVisible(false)}
+    />
+    <ImageViewerModal
+      visible={photoViewerVisible}
+      uri={family.photoUrl}
+      onClose={() => setPhotoViewerVisible(false)}
     />
     </>
   );

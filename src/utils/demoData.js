@@ -486,6 +486,12 @@ export const demoContributionCategoryAmounts = [
 ];
 
 
+export const demoChurchContacts = [
+  { role: 'vicar', name: 'Fr. Demo Vicar', phone: '555-0101', email: 'vicar@stthomas.org' },
+  { role: 'secretary', name: 'Demo Secretary', phone: '555-0102', email: 'secretary@stthomas.org' },
+  { role: 'treasurer', name: 'Demo Treasurer', phone: null, email: 'treasurer@stthomas.org' },
+];
+
 export const demoAppSettings = {
   googleCalendarId: 'demo-calendar',
   googleApiKey: 'demo-api-key',
@@ -508,19 +514,28 @@ export const demoDocuments = [
 
 // Keyed by YYYY-MM-DD — each entry is a public YouTube video for that Sunday's homily
 export const demoYoutubeVideos = {
+  '2026-05-03': {
+    videoId: 'dQw4w9WgXcQ',
+    title: '2nd Sunday After Easter Homily – May 3, 2026',
+    thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+    publishedAt: '2026-05-03T15:00:00Z',
+  },
   '2026-04-19': {
     videoId: 'dQw4w9WgXcQ',
     title: 'Easter Sunday Homily – April 19, 2026',
     thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+    publishedAt: '2026-04-19T15:00:00Z',
   },
   '2026-04-12': {
     videoId: 'dQw4w9WgXcQ',
     title: 'Palm Sunday Homily – April 12, 2026',
     thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+    publishedAt: '2026-04-12T15:00:00Z',
   },
   '2026-04-05': {
     videoId: 'dQw4w9WgXcQ',
     title: '5th Sunday of Lent Homily – April 5, 2026',
     thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+    publishedAt: '2026-04-05T15:00:00Z',
   },
 };

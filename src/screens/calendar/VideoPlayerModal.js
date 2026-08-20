@@ -51,7 +51,7 @@ const VideoPlayerModal = ({ visible, video, churchName, onClose }) => {
           <View style={styles.playerWrapper}>
             <YoutubePlayer
               height={playerHeight}
-              videoId={video.videoId}
+              videoId={video.id}
               onChangeState={onStateChange}
               initialPlayerParams={{ modestbranding: true, rel: 0 }}
               webViewProps={{

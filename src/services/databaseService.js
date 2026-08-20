@@ -12,6 +12,7 @@ import {
   demoMembers,
   demoUserRole,
   demoAppSettings,
+  demoChurchContacts,
   demoContributions,
   demoContributionCategoryAmounts,
 } from '../utils/demoData';
@@ -112,15 +113,25 @@ class DatabaseService {
           const hohNames = hohMembers.map(m => m.firstName).join(' & ') || null;
           const allMembers = demoMembers.filter(m => m.familyId === f.id && m.isActive);
           const memberFirstNames = allMembers.map(m => m.firstName);
+          const memberLastNames = allMembers.map(m => m.lastName).filter(Boolean);
+          const memberAliases = allMembers.map(m => m.alias).filter(Boolean);
           const memberPhoneNumbers = allMembers.map(m => m.phoneNumber).filter(Boolean);
-          return { ...f, photoUrl: demoPhotoOverrides[f.id] || f.photoUrl, hohNames, memberFirstNames, memberPhoneNumbers };
+          return {
+            ...f,
+            photoUrl: demoPhotoOverrides[f.id] || f.photoUrl,
+            hohNames,
+            memberFirstNames,
+            memberLastNames,
+            memberAliases,
+            memberPhoneNumbers,
+          };
         });
       return { data: families, error: null };
     }
 
     const { data, error } = await supabase
       .from('families')
-      .select('*, members(id, first_name, alias, phone_number, is_head_of_household, created_at)')
+      .select('*, members(id, first_name, last_name, alias, phone_number, is_head_of_household, created_at)')
       .eq('is_active', true)
       .order('family_name', { ascending: true });
 
@@ -133,6 +144,7 @@ class DatabaseService {
           .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
         family.hohNames = hohMembers.map(m => m.first_name).join(' & ') || null;
         family.memberFirstNames = (row.members || []).map(m => m.first_name);
+        family.memberLastNames = (row.members || []).map(m => m.last_name).filter(Boolean);
         family.memberAliases = (row.members || []).map(m => m.alias).filter(Boolean);
         family.memberPhoneNumbers = (row.members || []).map(m => m.phone_number).filter(Boolean);
         return family;
@@ -311,21 +323,21 @@ class DatabaseService {
     return { asofDate: data.asof_date };
   }
 
-  async getMealSignupCount(eventDate) {
+  async getMealSignupCount(eventId) {
     if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
-      return { data: demoMealSignups.filter(s => s.eventDate === eventDate).length, error: null };
+      return { data: demoMealSignups.filter(s => s.eventId === eventId).length, error: null };
     }
-    const { data, error } = await supabase.rpc('meal_signup_count', { p_date: eventDate });
+    const { data, error } = await supabase.rpc('meal_signup_count_for_event', { p_event_id: eventId });
     if (error) return { data: 0, error: error.message };
     return { data: Number(data), error: null };
   }
 
-  async getMealSignups(eventDate) {
+  async getMealSignups(eventId) {
     if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       const signups = demoMealSignups
-        .filter(s => s.eventDate === eventDate)
+        .filter(s => s.eventId === eventId)
         .map(s => {
           const m = demoMembers.find(dm => dm.id === s.memberId);
           return {
@@ -340,7 +352,7 @@ class DatabaseService {
     const { data, error } = await supabase
       .from('meal_signups')
       .select('id, member_id, created_at, member:members(first_name, last_name, family_id, family:families(membership_id))')
-      .eq('event_date', eventDate);
+      .eq('event_id', eventId);
     if (error) return { data: null, error: error.message };
     return {
       data: (data ?? []).map(row => ({
@@ -360,18 +372,18 @@ class DatabaseService {
     };
   }
 
-  async createMealSignup(memberId, eventDate) {
+  async createMealSignup(memberId, eventDate, eventId) {
     if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
-      const existing = demoMealSignups.find(s => s.memberId === memberId && s.eventDate === eventDate);
+      const existing = demoMealSignups.find(s => s.memberId === memberId && s.eventId === eventId);
       if (existing) return { data: existing, error: null };
-      const signup = { id: `demo-signup-${Date.now()}`, memberId, eventDate, createdAt: new Date().toISOString() };
+      const signup = { id: `demo-signup-${Date.now()}`, memberId, eventDate, eventId, createdAt: new Date().toISOString() };
       demoMealSignups.push(signup);
       return { data: signup, error: null };
     }
     const { data, error } = await supabase
       .from('meal_signups')
-      .insert({ member_id: memberId, event_date: eventDate })
+      .insert({ member_id: memberId, event_date: eventDate, event_id: eventId })
       .select('id')
       .single();
     if (error) return { data: null, error: error.message };
@@ -389,36 +401,36 @@ class DatabaseService {
     return { error: error?.message ?? null };
   }
 
-  async getMealSignupDates(fromDate, toDate) {
+  async getMealSignupEventIds(fromDate, toDate) {
     if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
-      const dates = [...new Set(
+      const ids = [...new Set(
         demoMealSignups
-          .filter(s => s.eventDate >= fromDate && s.eventDate <= toDate)
-          .map(s => s.eventDate)
+          .filter(s => s.eventDate >= fromDate && s.eventDate <= toDate && s.eventId)
+          .map(s => s.eventId)
       )];
-      return { data: dates, error: null };
+      return { data: ids, error: null };
     }
-    const { data, error } = await supabase.rpc('meal_signup_dates_in_range', { p_from: fromDate, p_to: toDate });
+    const { data, error } = await supabase.rpc('meal_signup_event_ids_in_range', { p_from: fromDate, p_to: toDate });
     if (error) return { data: null, error: error.message };
-    return { data: (data ?? []).map(row => row.event_date), error: null };
+    return { data: (data ?? []).map(row => row.event_id), error: null };
   }
 
-  async getFlowerSignupCount(eventDate) {
+  async getFlowerSignupCount(eventId) {
     if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
-      return { data: demoFlowerSignups.filter(s => s.eventDate === eventDate).length, error: null };
+      return { data: demoFlowerSignups.filter(s => s.eventId === eventId).length, error: null };
     }
-    const { data, error } = await supabase.rpc('flower_signup_count', { p_date: eventDate });
+    const { data, error } = await supabase.rpc('flower_signup_count_for_event', { p_event_id: eventId });
     if (error) return { data: 0, error: error.message };
     return { data: Number(data), error: null };
   }
 
-  async getFlowerSignups(eventDate) {
+  async getFlowerSignups(eventId) {
     if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       const signups = demoFlowerSignups
-        .filter(s => s.eventDate === eventDate)
+        .filter(s => s.eventId === eventId)
         .map(s => {
           const m = demoMembers.find(dm => dm.id === s.memberId);
           return {
@@ -433,7 +445,7 @@ class DatabaseService {
     const { data, error } = await supabase
       .from('flower_signups')
       .select('id, member_id, created_at, member:members(first_name, last_name, family_id, family:families(membership_id))')
-      .eq('event_date', eventDate);
+      .eq('event_id', eventId);
     if (error) return { data: null, error: error.message };
     return {
       data: (data ?? []).map(row => ({
@@ -453,18 +465,18 @@ class DatabaseService {
     };
   }
 
-  async createFlowerSignup(memberId, eventDate) {
+  async createFlowerSignup(memberId, eventDate, eventId) {
     if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
-      const existing = demoFlowerSignups.find(s => s.memberId === memberId && s.eventDate === eventDate);
+      const existing = demoFlowerSignups.find(s => s.memberId === memberId && s.eventId === eventId);
       if (existing) return { data: existing, error: null };
-      const signup = { id: `demo-signup-${Date.now()}`, memberId, eventDate, createdAt: new Date().toISOString() };
+      const signup = { id: `demo-signup-${Date.now()}`, memberId, eventDate, eventId, createdAt: new Date().toISOString() };
       demoFlowerSignups.push(signup);
       return { data: signup, error: null };
     }
     const { data, error } = await supabase
       .from('flower_signups')
-      .insert({ member_id: memberId, event_date: eventDate })
+      .insert({ member_id: memberId, event_date: eventDate, event_id: eventId })
       .select('id')
       .single();
     if (error) return { data: null, error: error.message };
@@ -482,19 +494,42 @@ class DatabaseService {
     return { error: error?.message ?? null };
   }
 
-  async getFlowerSignupDates(fromDate, toDate) {
+  async getFlowerSignupEventIds(fromDate, toDate) {
     if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
-      const dates = [...new Set(
+      const ids = [...new Set(
         demoFlowerSignups
-          .filter(s => s.eventDate >= fromDate && s.eventDate <= toDate)
-          .map(s => s.eventDate)
+          .filter(s => s.eventDate >= fromDate && s.eventDate <= toDate && s.eventId)
+          .map(s => s.eventId)
       )];
-      return { data: dates, error: null };
+      return { data: ids, error: null };
     }
-    const { data, error } = await supabase.rpc('flower_signup_dates_in_range', { p_from: fromDate, p_to: toDate });
+    const { data, error } = await supabase.rpc('flower_signup_event_ids_in_range', { p_from: fromDate, p_to: toDate });
     if (error) return { data: null, error: error.message };
-    return { data: (data ?? []).map(row => row.event_date), error: null };
+    return { data: (data ?? []).map(row => row.event_id), error: null };
+  }
+
+  async getChurchContacts() {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return { data: demoChurchContacts, error: null };
+    }
+
+    const { data, error } = await supabase
+      .from('church_contacts')
+      .select('*')
+      .order('display_order');
+
+    if (error) return { data: null, error: error.message };
+    return {
+      data: (data ?? []).map(row => ({
+        role: row.role,
+        name: row.name,
+        phone: row.phone,
+        email: row.email,
+      })),
+      error: null,
+    };
   }
 
   async getAppSettings() {
