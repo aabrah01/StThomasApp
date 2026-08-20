@@ -3,43 +3,52 @@
  * These run entirely against the in-memory demo state — no real Supabase calls.
  */
 
-// Force DEMO_MODE on before any modules are imported
+// Force DEMO_MODE on before any modules are imported.
+// Shape must match src/utils/config.js — authService destructures all of these.
 jest.mock('../../utils/config', () => ({
   DEMO_MODE: true,
-  DEMO_CREDENTIALS: { email: 'demo@example.com', password: 'demo123' },
+  DEMO_CREDENTIALS: { email: 'demo@example.com', pin: '123456' },
   DEMO_EMAIL: 'demo@stthomasli.org',
   DEMO_PIN: '123456',
   setDemoSession: jest.fn(),
   isDemoSession: () => true,
 }));
 
+const DEMO_EMAIL = 'demo@example.com';
+const DEMO_PIN = '123456';
+
 // Re-import each test to get a fresh AuthService instance
 let authService;
 beforeEach(() => {
   jest.resetModules();
-  jest.mock('../../utils/config', () => ({
-    DEMO_MODE: true,
-    DEMO_CREDENTIALS: { email: 'demo@example.com', password: 'demo123' },
-  }));
   authService = require('../../services/authService').default;
 });
 
+// Login is two steps: request a PIN, then verify it.
+const signInDemo = () => authService.verifyPin(DEMO_EMAIL, DEMO_PIN);
+
 describe('AuthService — demo mode', () => {
-  describe('signIn', () => {
-    it('returns a user on valid demo credentials', async () => {
-      const result = await authService.signIn('demo@example.com', 'demo123');
+  describe('requestPin', () => {
+    it('returns no error for the demo email', async () => {
+      const result = await authService.requestPin(DEMO_EMAIL);
+      expect(result.error).toBeNull();
+    });
+
+    it('returns an error for an email that is not registered', async () => {
+      const result = await authService.requestPin('wrong@example.com');
+      expect(result.error).toBeTruthy();
+    });
+  });
+
+  describe('verifyPin', () => {
+    it('returns a user on the correct PIN', async () => {
+      const result = await signInDemo();
       expect(result.error).toBeNull();
       expect(result.user).toBeTruthy();
     });
 
-    it('returns an error on wrong email', async () => {
-      const result = await authService.signIn('wrong@example.com', 'demo123');
-      expect(result.user).toBeNull();
-      expect(result.error).toBeTruthy();
-    });
-
-    it('returns an error on wrong password', async () => {
-      const result = await authService.signIn('demo@example.com', 'wrongpassword');
+    it('returns an error on an incorrect PIN', async () => {
+      const result = await authService.verifyPin(DEMO_EMAIL, '000000');
       expect(result.user).toBeNull();
       expect(result.error).toBeTruthy();
     });
@@ -47,19 +56,12 @@ describe('AuthService — demo mode', () => {
 
   describe('signOut', () => {
     it('clears auth state after sign in', async () => {
-      await authService.signIn('demo@example.com', 'demo123');
+      await signInDemo();
       expect(authService.getCurrentUser()).toBeTruthy();
 
       const result = await authService.signOut();
       expect(result.error).toBeNull();
       expect(authService.getCurrentUser()).toBeNull();
-    });
-  });
-
-  describe('resetPassword', () => {
-    it('always returns no error in demo mode', async () => {
-      const result = await authService.resetPassword('any@example.com');
-      expect(result.error).toBeNull();
     });
   });
 
@@ -78,7 +80,7 @@ describe('AuthService — demo mode', () => {
 
       // Wait for immediate null callback
       await new Promise(resolve => setTimeout(resolve, 10));
-      await authService.signIn('demo@example.com', 'demo123');
+      await signInDemo();
 
       expect(received.length).toBeGreaterThanOrEqual(2);
       expect(received[received.length - 1]).toBeTruthy(); // last callback has user
@@ -86,7 +88,7 @@ describe('AuthService — demo mode', () => {
     });
 
     it('notifies listeners when user signs out', async () => {
-      await authService.signIn('demo@example.com', 'demo123');
+      await signInDemo();
       const received = [];
       const unsubscribe = authService.onAuthStateChange((user) => received.push(user));
 
@@ -105,7 +107,7 @@ describe('AuthService — demo mode', () => {
 
       const countBefore = received.length;
       unsubscribe();
-      await authService.signIn('demo@example.com', 'demo123');
+      await signInDemo();
 
       expect(received.length).toBe(countBefore); // no new callbacks after unsubscribe
     });
@@ -117,7 +119,7 @@ describe('AuthService — demo mode', () => {
     });
 
     it('returns user after sign-in', async () => {
-      await authService.signIn('demo@example.com', 'demo123');
+      await signInDemo();
       expect(authService.getCurrentUser()).toBeTruthy();
     });
   });
