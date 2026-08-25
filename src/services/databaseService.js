@@ -26,6 +26,29 @@ const demoMealSignups = [];
 // In-memory flower signup store for demo mode
 const demoFlowerSignups = [];
 
+// In-memory church-provided services for demo mode
+const demoServiceProvisions = [];
+
+/**
+ * Tell the secretary and treasurer that a pledge was made or withdrawn.
+ *
+ * Fire-and-forget by design: the sign-up itself has already committed, so a
+ * mail failure must not surface as a failed pledge. Everything passed here is a
+ * key the Edge Function looks up — the name comes from the members table (after
+ * it checks the member is linked to the caller) and the service name from Google
+ * Calendar — so no text from the app reaches the email.
+ */
+const notifySignup = async (kind, action, memberId, eventDate, eventId) => {
+  try {
+    const { error } = await supabase.functions.invoke('notify-signup', {
+      body: { kind, action, memberId, eventDate, eventId },
+    });
+    if (error) console.warn('[signup notify] not sent:', error.message);
+  } catch (err) {
+    console.warn('[signup notify] not sent:', err);
+  }
+};
+
 // ── Row mappers ───────────────────────────────────────────────────────────────
 
 const mapFamily = (row) => ({
@@ -387,10 +410,11 @@ class DatabaseService {
       .select('id')
       .single();
     if (error) return { data: null, error: error.message };
+    notifySignup('meal', 'created', memberId, eventDate, eventId);
     return { data: { id: data.id }, error: null };
   }
 
-  async deleteMealSignup(signupId) {
+  async deleteMealSignup(signupId, memberId, eventDate, eventId) {
     if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       const idx = demoMealSignups.findIndex(s => s.id === signupId);
@@ -398,7 +422,9 @@ class DatabaseService {
       return { error: null };
     }
     const { error } = await supabase.from('meal_signups').delete().eq('id', signupId);
-    return { error: error?.message ?? null };
+    if (error) return { error: error.message };
+    notifySignup('meal', 'cancelled', memberId, eventDate, eventId);
+    return { error: null };
   }
 
   async getMealSignupEventIds(fromDate, toDate) {
@@ -480,10 +506,11 @@ class DatabaseService {
       .select('id')
       .single();
     if (error) return { data: null, error: error.message };
+    notifySignup('flower', 'created', memberId, eventDate, eventId);
     return { data: { id: data.id }, error: null };
   }
 
-  async deleteFlowerSignup(signupId) {
+  async deleteFlowerSignup(signupId, memberId, eventDate, eventId) {
     if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       const idx = demoFlowerSignups.findIndex(s => s.id === signupId);
@@ -491,7 +518,9 @@ class DatabaseService {
       return { error: null };
     }
     const { error } = await supabase.from('flower_signups').delete().eq('id', signupId);
-    return { error: error?.message ?? null };
+    if (error) return { error: error.message };
+    notifySignup('flower', 'cancelled', memberId, eventDate, eventId);
+    return { error: null };
   }
 
   async getFlowerSignupEventIds(fromDate, toDate) {
@@ -507,6 +536,77 @@ class DatabaseService {
     const { data, error } = await supabase.rpc('flower_signup_event_ids_in_range', { p_from: fromDate, p_to: toDate });
     if (error) return { data: null, error: error.message };
     return { data: (data ?? []).map(row => row.event_id), error: null };
+  }
+
+  // ── Church-provided services ────────────────────────────────────────────────
+  // Kept apart from the sign-up tables so an admin with no member record — the
+  // secretary and treasurer both sign in on office accounts — can still mark a
+  // service. `kind` is 'meal' or 'flower'.
+
+  async getServiceProvision(kind, eventId) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return { data: demoServiceProvisions.some(p => p.kind === kind && p.eventId === eventId), error: null };
+    }
+    const { data, error } = await supabase
+      .from('service_provisions')
+      .select('event_id')
+      .eq('kind', kind)
+      .eq('event_id', eventId)
+      .maybeSingle();
+    if (error) return { data: false, error: error.message };
+    return { data: !!data, error: null };
+  }
+
+  async setServiceProvision(kind, eventId, eventDate) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      if (!demoServiceProvisions.some(p => p.kind === kind && p.eventId === eventId)) {
+        demoServiceProvisions.push({ kind, eventId, eventDate });
+      }
+      return { error: null };
+    }
+    // Upsert rather than insert: marking a service twice is a no-op, not an error
+    const { error } = await supabase
+      .from('service_provisions')
+      .upsert({ kind, event_id: eventId, event_date: eventDate }, { onConflict: 'event_id,kind' });
+    return { error: error?.message ?? null };
+  }
+
+  // Every church-provided service in a date range, so the Sign-Ups list can show
+  // it on collapsed rows without a query per service.
+  async getServiceProvisionsInRange(fromDate, toDate) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return {
+        data: demoServiceProvisions
+          .filter(p => p.eventDate >= fromDate && p.eventDate <= toDate)
+          .map(p => ({ kind: p.kind, eventId: p.eventId })),
+        error: null,
+      };
+    }
+    const { data, error } = await supabase
+      .from('service_provisions')
+      .select('kind, event_id')
+      .gte('event_date', fromDate)
+      .lte('event_date', toDate);
+    if (error) return { data: null, error: error.message };
+    return { data: (data ?? []).map(row => ({ kind: row.kind, eventId: row.event_id })), error: null };
+  }
+
+  async clearServiceProvision(kind, eventId) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const idx = demoServiceProvisions.findIndex(p => p.kind === kind && p.eventId === eventId);
+      if (idx !== -1) demoServiceProvisions.splice(idx, 1);
+      return { error: null };
+    }
+    const { error } = await supabase
+      .from('service_provisions')
+      .delete()
+      .eq('kind', kind)
+      .eq('event_id', eventId);
+    return { error: error?.message ?? null };
   }
 
   async getChurchContacts() {

@@ -18,9 +18,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import databaseService from '../../services/databaseService';
 import storageService from '../../services/storageService';
-import Avatar from '../../components/common/Avatar';
 import CropModal from '../../components/common/CropModal';
+import ImageViewerModal from '../../components/common/ImageViewerModal';
 import ScreenHeader from '../../components/common/ScreenHeader';
+import { FAMILY_PHOTO_ASPECT, FAMILY_PHOTO_ASPECT_PAIR } from '../../utils/constants';
 import { useTheme } from '../../hooks/useTheme';
 import { useCommonStyles } from '../../styles/commonStyles';
 import * as Application from 'expo-application';
@@ -35,6 +36,7 @@ const ProfileScreen = ({ navigation }) => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [cropModalVisible, setCropModalVisible] = useState(false);
   const [pendingImageUri, setPendingImageUri] = useState(null);
+  const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
   const { markScreenReady } = useDataReady();
   const { refreshKey } = useAppRefresh();
 
@@ -92,7 +94,7 @@ const ProfileScreen = ({ navigation }) => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: 'images',
       allowsEditing: Platform.OS !== 'android',
-      aspect: [1, 1],
+      aspect: FAMILY_PHOTO_ASPECT_PAIR,
       quality: 0.8,
       ...(Platform.OS === 'android' && { legacy: true }),
     });
@@ -147,95 +149,132 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
+  const canEditPhoto = !!family && (isAdmin() || member?.isHeadOfHousehold);
+
+  const accountRows = [
+    member && {
+      key: 'name',
+      icon: '👤',
+      label: 'Name',
+      value: `${member.firstName} ${member.lastName}`,
+    },
+    user?.email && {
+      key: 'email',
+      icon: '✉️',
+      label: 'Email',
+      value: user.email,
+    },
+    member && {
+      key: 'hoh',
+      icon: '⭐',
+      label: 'Head of Household',
+      value: member.isHeadOfHousehold ? 'Yes' : 'No',
+    },
+    family?.membershipId && {
+      key: 'membershipId',
+      icon: '🆔',
+      label: 'Membership ID',
+      value: family.membershipId,
+    },
+    family && {
+      key: 'family',
+      icon: '🏠',
+      label: 'Family',
+      value: family.familyName,
+      onPress: handleViewFamily,
+    },
+    userRole && {
+      key: 'role',
+      icon: '🔑',
+      label: 'Role',
+      value: userRole.role === 'admin' ? 'Administrator' : 'Member',
+    },
+    member?.phoneNumber && {
+      key: 'phone',
+      icon: '📞',
+      label: 'Phone',
+      value: member.phoneNumber,
+    },
+  ].filter(Boolean);
+
   return (
     <View style={commonStyles.container}>
       <ScreenHeader title="My Profile" onBack={() => navigation.goBack()} />
     <ScrollView style={commonStyles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <View style={styles.avatarWrapper}>
-          <Avatar
-            source={member?.photoUrl}
-            name={member ? `${member.firstName} ${member.lastName}` : user?.email}
-            size={84}
-          />
-        </View>
-        {member && (
-          <>
-            <Text style={styles.name}>
-              {member.firstName} {member.lastName}
+      {/* Family photo leads the screen; editing it happens here rather than in
+          a row, now that the photo itself is on screen */}
+      <View style={styles.photoWrapper}>
+        {family?.photoUrl ? (
+          <TouchableOpacity
+            style={styles.photo}
+            onPress={() => setPhotoViewerVisible(true)}
+            activeOpacity={0.9}
+            accessibilityRole="imagebutton"
+            accessibilityLabel="View family photo full screen"
+          >
+            <Image source={{ uri: family.photoUrl }} style={styles.photo} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.photoPlaceholder}>
+            <Ionicons name="home-outline" size={40} color={theme.colors.textLight} />
+            <Text style={styles.photoPlaceholderText}>
+              {canEditPhoto ? 'Add a family photo' : 'No family photo'}
             </Text>
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleText}>{member.role}</Text>
-            </View>
-          </>
+          </View>
         )}
-        <Text style={styles.email}>{user?.email}</Text>
+
+        {canEditPhoto && (
+          <TouchableOpacity
+            style={styles.photoEditButton}
+            onPress={handleUploadFamilyPhoto}
+            disabled={uploadingPhoto}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityRole="button"
+            accessibilityLabel={family?.photoUrl ? 'Update family photo' : 'Add family photo'}
+          >
+            {uploadingPhoto
+              ? <ActivityIndicator size="small" color="#FFFFFF" />
+              : <Ionicons name="camera" size={20} color="#FFFFFF" />}
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.body}>
-        {(family || userRole || member?.phoneNumber) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Account</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
 
-            {family && (
-              <TouchableOpacity style={styles.row} onPress={handleViewFamily}>
+          {/* Built as a list so the bottom border lands on whichever row is
+              actually last, however many are present */}
+          {accountRows.map((row, index) => {
+            const isLast = index === accountRows.length - 1;
+            const inner = (
+              <>
                 <View style={styles.iconBox}>
-                  <Text style={styles.rowIcon}>🏠</Text>
+                  <Text style={styles.rowIcon}>{row.icon}</Text>
                 </View>
                 <View style={styles.rowContent}>
-                  <Text style={styles.rowLabel}>Family</Text>
-                  <Text style={styles.rowValue}>{family.familyName}</Text>
+                  <Text style={styles.rowLabel}>{row.label}</Text>
+                  <Text style={styles.rowValue}>{row.value}</Text>
                 </View>
-                <Text style={styles.chevron}>›</Text>
+                {row.onPress ? <Text style={styles.chevron}>›</Text> : null}
+              </>
+            );
+
+            return row.onPress ? (
+              <TouchableOpacity
+                key={row.key}
+                style={[styles.row, isLast && styles.lastRow]}
+                onPress={row.onPress}
+              >
+                {inner}
               </TouchableOpacity>
-            )}
-
-            {family && (isAdmin() || member?.isHeadOfHousehold) && (
-              <TouchableOpacity style={styles.row} onPress={handleUploadFamilyPhoto} disabled={uploadingPhoto}>
-                <View style={styles.iconBox}>
-                  {family.photoUrl ? (
-                    <Image source={{ uri: family.photoUrl }} style={styles.familyPhotoThumb} />
-                  ) : (
-                    <Ionicons name="camera-outline" size={18} color={theme.colors.sapphire} />
-                  )}
-                </View>
-                <View style={styles.rowContent}>
-                  <Text style={styles.rowLabel}>Family Photo</Text>
-                  <Text style={styles.rowValue}>{family.photoUrl ? 'Update photo' : 'Add a photo'}</Text>
-                </View>
-                {uploadingPhoto
-                  ? <ActivityIndicator size="small" color={theme.colors.sapphire} />
-                  : <Ionicons name="chevron-forward" size={16} color={theme.colors.textLight} />}
-              </TouchableOpacity>
-            )}
-
-            {userRole && (
-              <View style={[styles.row, !member?.phoneNumber && styles.lastRow]}>
-                <View style={styles.iconBox}>
-                  <Text style={styles.rowIcon}>🔑</Text>
-                </View>
-                <View style={styles.rowContent}>
-                  <Text style={styles.rowLabel}>Role</Text>
-                  <Text style={styles.rowValue}>
-                    {userRole.role === 'admin' ? 'Administrator' : 'Member'}
-                  </Text>
-                </View>
+            ) : (
+              <View key={row.key} style={[styles.row, isLast && styles.lastRow]}>
+                {inner}
               </View>
-            )}
-
-            {member?.phoneNumber && (
-              <View style={[styles.row, styles.lastRow]}>
-                <View style={styles.iconBox}>
-                  <Text style={styles.rowIcon}>📞</Text>
-                </View>
-                <View style={styles.rowContent}>
-                  <Text style={styles.rowLabel}>Phone</Text>
-                  <Text style={styles.rowValue}>{member.phoneNumber}</Text>
-                </View>
-              </View>
-            )}
-          </View>
-        )}
+            );
+          })}
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>App</Text>
@@ -260,53 +299,57 @@ const ProfileScreen = ({ navigation }) => {
     <CropModal
       visible={cropModalVisible}
       imageUri={pendingImageUri}
+      aspectRatio={FAMILY_PHOTO_ASPECT}
       onCrop={(uri) => {
         setCropModalVisible(false);
         uploadFamilyPhoto(uri);
       }}
       onCancel={() => setCropModalVisible(false)}
     />
+    <ImageViewerModal
+      visible={photoViewerVisible}
+      uri={family?.photoUrl}
+      onClose={() => setPhotoViewerVisible(false)}
+    />
     </View>
   );
 };
 
 const makeStyles = (theme) => StyleSheet.create({
-  header: {
-    backgroundColor: theme.colors.sapphire,
+  // Slightly wider than tall — a family group photo reads better landscape,
+  // and the body's rounded top overlaps its lower edge
+  photoWrapper: {
+    width: '100%',
+    aspectRatio: 1.4,
+    backgroundColor: theme.colors.surfaceSecondary,
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  photoPlaceholder: {
+    flex: 1,
     alignItems: 'center',
-    paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.xxl,
-    paddingHorizontal: theme.spacing.md,
+    justifyContent: 'center',
+    paddingBottom: theme.spacing.lg,
   },
-  avatarWrapper: {
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.4)',
-    borderRadius: 999,
-    padding: 3,
-    marginBottom: theme.spacing.md,
-  },
-  name: {
-    fontSize: theme.fonts.sizes.xxl,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-    marginBottom: theme.spacing.sm,
-  },
-  roleBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.round,
-    marginBottom: theme.spacing.sm,
-  },
-  roleText: {
-    color: 'rgba(255,255,255,0.9)',
+  photoPlaceholderText: {
+    marginTop: theme.spacing.sm,
     fontSize: theme.fonts.sizes.sm,
-    fontWeight: '600',
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
   },
-  email: {
-    fontSize: theme.fonts.sizes.sm,
-    color: 'rgba(255,255,255,0.7)',
+  photoEditButton: {
+    position: 'absolute',
+    right: theme.spacing.md,
+    top: theme.spacing.md,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   body: {
     marginTop: -theme.spacing.lg,
@@ -376,11 +419,6 @@ const makeStyles = (theme) => StyleSheet.create({
   chevron: {
     fontSize: 22,
     color: theme.colors.textLight,
-  },
-  familyPhotoThumb: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
   },
   logoutButton: {
     backgroundColor: theme.colors.surface,

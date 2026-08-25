@@ -52,7 +52,7 @@ export const HOME_CARDS = [
   },
   {
     key: 'contact',
-    label: 'Contact',
+    label: 'Administration',
     sublabel: 'Staff and clergy',
     icon: 'call-outline',
     target: 'Contact',

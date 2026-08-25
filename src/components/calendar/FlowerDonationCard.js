@@ -13,15 +13,17 @@ const FlowerDonationCard = React.memo(({ eventDate, eventId, onSignupChange, ref
 
   const [count, setCount] = useState(0);
   const [signups, setSignups] = useState([]);
+  const [churchProvided, setChurchProvided] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     setError('');
-    const [countResult, signupsResult] = await Promise.all([
+    const [countResult, signupsResult, churchResult] = await Promise.all([
       databaseService.getFlowerSignupCount(eventId),
       databaseService.getFlowerSignups(eventId),
+      databaseService.getServiceProvision('flower', eventId),
     ]);
     if (countResult.error) {
       setError(countResult.error);
@@ -29,6 +31,7 @@ const FlowerDonationCard = React.memo(({ eventDate, eventId, onSignupChange, ref
       setCount(countResult.data);
     }
     if (signupsResult.data) setSignups(signupsResult.data);
+    setChurchProvided(churchResult.data);
     setLoading(false);
   }, [eventId]);
 
@@ -36,6 +39,7 @@ const FlowerDonationCard = React.memo(({ eventDate, eventId, onSignupChange, ref
     setLoading(true);
     setSignups([]);
     setCount(0);
+    setChurchProvided(false);
     load();
   }, [load, refreshKey]);
 
@@ -59,10 +63,37 @@ const FlowerDonationCard = React.memo(({ eventDate, eventId, onSignupChange, ref
     setActionLoading(false);
   };
 
+  // Marking the service as budgeted. Nothing here touches a sign-up row, so it
+  // works for an office account with no member record.
+  const handleChurchProvide = async () => {
+    setActionLoading(true);
+    const { error: err } = await databaseService.setServiceProvision('flower', eventId, eventDate);
+    if (err) {
+      setError(err);
+    } else {
+      await load();
+      onSignupChange?.(eventDate);
+    }
+    setActionLoading(false);
+  };
+
+  const handleChurchCancel = async () => {
+    setActionLoading(true);
+    const { error: err } = await databaseService.clearServiceProvision('flower', eventId);
+    if (err) {
+      setError(err);
+    } else {
+      await load();
+      onSignupChange?.(eventDate);
+    }
+    setActionLoading(false);
+  };
+
   const handleRemove = async () => {
     if (!ownSignup) return;
     setActionLoading(true);
-    const { error: err } = await databaseService.deleteFlowerSignup(ownSignup.id);
+    const { error: err } = await databaseService.deleteFlowerSignup(
+      ownSignup.id, ownSignup.memberId, eventDate, eventId);
     if (err) {
       setError(err);
     } else {
@@ -91,13 +122,22 @@ const FlowerDonationCard = React.memo(({ eventDate, eventId, onSignupChange, ref
             <Text style={styles.errorText}>{error}</Text>
           ) : (
             <>
-              <Text style={styles.countText}>
-                {count === 0
-                  ? 'No flower donations pledged yet'
-                  : count === 1
-                  ? '1 person has pledged to donate flowers'
-                  : `${count} people have pledged to donate flowers`}
-              </Text>
+              {churchProvided ? (
+                <View style={styles.churchNotice}>
+                  <Ionicons name="business" size={16} color={theme.colors.sapphire} />
+                  <Text style={styles.churchText}>
+                    Flowers for this service are being provided by the church
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.countText}>
+                  {count === 0
+                    ? 'No flower donations pledged yet'
+                    : count === 1
+                    ? '1 person has pledged to donate flowers'
+                    : `${count} people have pledged to donate flowers`}
+                </Text>
+              )}
 
               {familySignups.map(s => (
                 <Text key={s.id} style={styles.familyText}>
@@ -118,6 +158,8 @@ const FlowerDonationCard = React.memo(({ eventDate, eventId, onSignupChange, ref
                 </View>
               )}
 
+              {/* A member who pledged before the church took the service over keeps
+                  their row and can still withdraw it. */}
               {ownSignup ? (
                 <View style={styles.ownRow}>
                   <Text style={styles.ownText}>You have pledged to donate flowers</Text>
@@ -136,7 +178,12 @@ const FlowerDonationCard = React.memo(({ eventDate, eventId, onSignupChange, ref
                     </TouchableOpacity>
                   )}
                 </View>
-              ) : !isPast ? (
+              ) : null}
+
+              {/* Admins pledge like anyone else — gated on having a member record
+                  rather than on role, since the sign-up row must belong to a
+                  member. An office account has none, so it is offered no pledge. */}
+              {member?.id && !churchProvided && !ownSignup && !isPast ? (
                 <TouchableOpacity
                   style={[styles.pledgeButton, actionLoading && styles.pledgeButtonDisabled]}
                   onPress={handlePledge}
@@ -150,6 +197,25 @@ const FlowerDonationCard = React.memo(({ eventDate, eventId, onSignupChange, ref
                       <Ionicons name="add-circle-outline" size={16} color="#FFFFFF" style={styles.pledgeIcon} />
                       <Text style={styles.pledgeButtonText}>Pledge to Donate Flowers</Text>
                     </>
+                  )}
+                </TouchableOpacity>
+              ) : null}
+
+              {/* Role alone — service_provisions rows belong to no member, so this
+                  is the one action an office account can carry out here. */}
+              {adminMode && !isPast ? (
+                <TouchableOpacity
+                  style={styles.churchButton}
+                  onPress={churchProvided ? handleChurchCancel : handleChurchProvide}
+                  disabled={actionLoading}
+                  activeOpacity={0.75}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator size="small" color={theme.colors.sapphire} />
+                  ) : (
+                    <Text style={styles.churchButtonText}>
+                      {churchProvided ? 'Church is no longer providing' : 'Church is providing this'}
+                    </Text>
                   )}
                 </TouchableOpacity>
               ) : null}
@@ -205,6 +271,37 @@ const makeStyles = (theme) => StyleSheet.create({
     color: theme.colors.text,
     fontWeight: '600',
     marginBottom: theme.spacing.xs,
+  },
+  // Replaces the count outright when the church is covering it — a pledge tally
+  // beside "no sign-ups needed" only invites the sign-up we just removed.
+  churchNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    backgroundColor: theme.colors.surfaceSecondary,
+    borderRadius: theme.borderRadius.md,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
+  },
+  churchText: {
+    flex: 1,
+    fontSize: theme.fonts.sizes.sm,
+    fontWeight: '700',
+    color: theme.colors.sapphire,
+  },
+  churchButton: {
+    marginTop: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.sapphire,
+    alignItems: 'center',
+  },
+  churchButtonText: {
+    fontSize: theme.fonts.sizes.sm,
+    fontWeight: '700',
+    color: theme.colors.sapphire,
   },
   familyText: {
     fontSize: theme.fonts.sizes.sm,

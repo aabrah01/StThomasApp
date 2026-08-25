@@ -23,6 +23,7 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import CropModal from '../../components/common/CropModal';
 import ImageViewerModal from '../../components/common/ImageViewerModal';
+import { FAMILY_PHOTO_ASPECT, FAMILY_PHOTO_ASPECT_PAIR } from '../../utils/constants';
 import { useTheme } from '../../hooks/useTheme';
 import { useCommonStyles } from '../../styles/commonStyles';
 
@@ -148,7 +149,7 @@ const FamilyDetailScreen = ({ route, navigation }) => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: 'images',
       allowsEditing: Platform.OS !== 'android',
-      aspect: [1, 1],
+      aspect: FAMILY_PHOTO_ASPECT_PAIR,
       quality: 0.8,
       ...(Platform.OS === 'android' && { legacy: true }),
     });
@@ -345,6 +346,7 @@ const FamilyDetailScreen = ({ route, navigation }) => {
     <CropModal
       visible={cropModalVisible}
       imageUri={pendingImageUri}
+      aspectRatio={FAMILY_PHOTO_ASPECT}
       onCrop={(uri) => {
         setCropModalVisible(false);
         uploadPhoto(uri);

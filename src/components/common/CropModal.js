@@ -15,10 +15,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-export default function CropModal({ visible, imageUri, onCrop, onCancel }) {
+// aspectRatio is width / height. 1 gives the square crop this started as;
+// callers pass the ratio the photo will actually be displayed at.
+export default function CropModal({ visible, imageUri, onCrop, onCancel, aspectRatio = 1 }) {
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const cropSize = screenWidth;
+  const frameW = screenWidth;
+  const frameH = Math.round(screenWidth / aspectRatio);
 
   const [imageSize, setImageSize] = useState(null);
   const [processing, setProcessing] = useState(false);
@@ -28,9 +31,12 @@ export default function CropModal({ visible, imageUri, onCrop, onCancel }) {
 
   const currentPan = useRef({ x: 0, y: 0 });
   const imageSizeRef = useRef(null);
-  const cropSizeRef = useRef(cropSize);
+  const frameRef = useRef({ w: frameW, h: frameH });
 
-  useEffect(() => { cropSizeRef.current = cropSize; }, [cropSize]);
+  useEffect(() => { frameRef.current = { w: frameW, h: frameH }; }, [frameW, frameH]);
+
+  // Scale that makes the image cover the frame in both directions
+  const coverScale = (sz, frame) => Math.max(frame.w / sz.width, frame.h / sz.height);
 
   // Use ImageManipulator to get EXIF-corrected dimensions — same coordinate
   // space as the final crop call, and reliable on Android.
@@ -51,14 +57,14 @@ export default function CropModal({ visible, imageUri, onCrop, onCancel }) {
 
   const getMaxPan = () => {
     const sz = imageSizeRef.current;
-    const cs = cropSizeRef.current;
-    if (!sz) return { maxPanX: 0, maxPanY: 0, displayW: cs, displayH: cs };
-    const scale = cs / Math.min(sz.width, sz.height);
+    const frame = frameRef.current;
+    if (!sz) return { maxPanX: 0, maxPanY: 0, displayW: frame.w, displayH: frame.h };
+    const scale = coverScale(sz, frame);
     const displayW = sz.width * scale;
     const displayH = sz.height * scale;
     return {
-      maxPanX: Math.max(0, (displayW - cs) / 2),
-      maxPanY: Math.max(0, (displayH - cs) / 2),
+      maxPanX: Math.max(0, (displayW - frame.w) / 2),
+      maxPanY: Math.max(0, (displayH - frame.h) / 2),
       displayW,
       displayH,
       scale,
@@ -88,20 +94,20 @@ export default function CropModal({ visible, imageUri, onCrop, onCancel }) {
 
   const handleChoose = async () => {
     const sz = imageSizeRef.current;
-    const cs = cropSizeRef.current;
+    const frame = frameRef.current;
     if (!sz) return;
 
     setProcessing(true);
     try {
-      const scale = cs / Math.min(sz.width, sz.height);
+      const scale = coverScale(sz, frame);
       const displayW = sz.width * scale;
       const displayH = sz.height * scale;
       const { x: px, y: py } = currentPan.current;
 
-      const originX = Math.round(clamp(((displayW - cs) / 2 - px) / scale, 0, sz.width - 1));
-      const originY = Math.round(clamp(((displayH - cs) / 2 - py) / scale, 0, sz.height - 1));
-      const cropW = Math.round(clamp(cs / scale, 1, sz.width - originX));
-      const cropH = Math.round(clamp(cs / scale, 1, sz.height - originY));
+      const originX = Math.round(clamp(((displayW - frame.w) / 2 - px) / scale, 0, sz.width - 1));
+      const originY = Math.round(clamp(((displayH - frame.h) / 2 - py) / scale, 0, sz.height - 1));
+      const cropW = Math.round(clamp(frame.w / scale, 1, sz.width - originX));
+      const cropH = Math.round(clamp(frame.h / scale, 1, sz.height - originY));
 
       const result = await ImageManipulator.manipulateAsync(
         imageUri,
@@ -115,10 +121,10 @@ export default function CropModal({ visible, imageUri, onCrop, onCancel }) {
     setProcessing(false);
   };
 
-  let displayW = cropSize;
-  let displayH = cropSize;
+  let displayW = frameW;
+  let displayH = frameH;
   if (imageSize) {
-    const scale = cropSize / Math.min(imageSize.width, imageSize.height);
+    const scale = coverScale(imageSize, { w: frameW, h: frameH });
     displayW = imageSize.width * scale;
     displayH = imageSize.height * scale;
   }
@@ -145,7 +151,7 @@ export default function CropModal({ visible, imageUri, onCrop, onCancel }) {
 
         <View style={styles.cropWrapper}>
           <View
-            style={[styles.cropFrame, { width: cropSize, height: cropSize }]}
+            style={[styles.cropFrame, { width: frameW, height: frameH }]}
             {...panResponder.panHandlers}
           >
             {imageUri ? (

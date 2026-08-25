@@ -6,6 +6,8 @@ import {
   SectionList,
   StyleSheet,
   ActivityIndicator,
+  RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -55,7 +57,7 @@ const SignupsScreen = ({ navigation }) => {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const commonStyles = useCommonStyles();
-  const { appSettings } = useAuth();
+  const { appSettings, refreshAppSettings } = useAuth();
   const {
     events,
     loading: eventsLoading,
@@ -63,6 +65,7 @@ const SignupsScreen = ({ navigation }) => {
     extending,
     loadedUntil,
     exhausted,
+    refresh: refreshEvents,
   } = useEvents();
 
   const mealEnabled = appSettings?.enableMealSignup ?? false;
@@ -70,8 +73,11 @@ const SignupsScreen = ({ navigation }) => {
 
   const [mealEventIds, setMealEventIds] = useState(new Set());
   const [flowerEventIds, setFlowerEventIds] = useState(new Set());
+  const [mealProvidedIds, setMealProvidedIds] = useState(new Set());
+  const [flowerProvidedIds, setFlowerProvidedIds] = useState(new Set());
   const [expandedId, setExpandedId] = useState(null);
   const [cardRefreshKey, setCardRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   // One row per Divine Liturgy — two on a Sunday get their own sign-ups. Nothing
   // else appears: no vespers, matins, choir practice or Sunday school.
@@ -120,7 +126,7 @@ const SignupsScreen = ({ navigation }) => {
     return groups;
   }, [services]);
 
-  // Two queries for the whole screen, regardless of how many services are listed
+  // Three queries for the whole screen, regardless of how many services are listed
   const loadSignupIds = useCallback(async () => {
     if (services.length === 0) return;
     const from = services[0].date;
@@ -133,6 +139,14 @@ const SignupsScreen = ({ navigation }) => {
     if (flowerEnabled) {
       const { data } = await databaseService.getFlowerSignupEventIds(from, to);
       if (data) setFlowerEventIds(new Set(data));
+    }
+
+    // One query covers both kinds — a collapsed row has to say the church is
+    // providing, not "No sign-ups yet", which reads as nobody having volunteered.
+    const { data: provisions } = await databaseService.getServiceProvisionsInRange(from, to);
+    if (provisions) {
+      setMealProvidedIds(new Set(provisions.filter(p => p.kind === 'meal').map(p => p.eventId)));
+      setFlowerProvidedIds(new Set(provisions.filter(p => p.kind === 'flower').map(p => p.eventId)));
     }
   }, [services, mealEnabled, flowerEnabled]);
 
@@ -154,6 +168,20 @@ const SignupsScreen = ({ navigation }) => {
     loadSignupIds();
   }, [loadSignupIds]);
 
+  // Pull to refresh. The badges are the stale part in practice — another member
+  // pledging, or an admin marking a service on another device, changes nothing
+  // this screen would otherwise hear about. Settings come along because the two
+  // feature flags decide which cards exist at all, and bumping cardRefreshKey
+  // re-fetches inside whichever row is open.
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refreshAppSettings();
+    await refreshEvents();
+    await loadSignupIds();
+    setCardRefreshKey(k => k + 1);
+    setRefreshing(false);
+  }, [refreshAppSettings, refreshEvents, loadSignupIds]);
+
   // One row open at a time — the donation cards each fetch on mount, so this
   // keeps the screen at two queries plus whatever the open row needs.
   const toggle = (id) => {
@@ -174,10 +202,21 @@ const SignupsScreen = ({ navigation }) => {
           <ActivityIndicator size="large" color={theme.colors.accent} />
         </View>
       ) : services.length === 0 ? (
-        <View style={styles.centered}>
+        // Scrollable so this state can be pulled too. A plain View would strand
+        // anyone whose calendar fetch failed with no way to retry but leaving.
+        <ScrollView
+          contentContainerStyle={styles.centeredScroll}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.accent}
+            />
+          }
+        >
           <Text style={styles.emptyIcon}>🍽️</Text>
           <Text style={styles.emptyText}>No upcoming liturgy days</Text>
-        </View>
+        </ScrollView>
       ) : (
         <SectionList
           sections={sections}
@@ -187,6 +226,13 @@ const SignupsScreen = ({ navigation }) => {
           )}
           stickySectionHeadersEnabled={false}
           contentContainerStyle={styles.content}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.accent}
+            />
+          }
           // The calendar is only fetched 90 days ahead — pull the next window
           // when the user reaches the bottom
           onEndReached={extendForward}
@@ -202,8 +248,12 @@ const SignupsScreen = ({ navigation }) => {
           }
           renderItem={({ item: { id, date, title: eventTitle, startDate, showTime } }) => {
             const expanded = expandedId === id;
-            const hasMeal = mealEnabled && mealEventIds.has(id);
-            const hasFlower = flowerEnabled && flowerEventIds.has(id);
+            const providedMeal = mealEnabled && mealProvidedIds.has(id);
+            const providedFlower = flowerEnabled && flowerProvidedIds.has(id);
+            // A church-provided service supersedes the pledge badge: nobody is
+            // being asked to sign up, so the count is not the story.
+            const hasMeal = mealEnabled && !providedMeal && mealEventIds.has(id);
+            const hasFlower = flowerEnabled && !providedFlower && flowerEventIds.has(id);
 
             return (
               <View style={styles.dateBlock}>
@@ -224,6 +274,18 @@ const SignupsScreen = ({ navigation }) => {
                       </Text>
                     ) : null}
                     <View style={styles.badgeRow}>
+                      {providedMeal && (
+                        <View style={[styles.badge, styles.badgeChurch]}>
+                          <Ionicons name="restaurant-outline" size={12} color="#FFFFFF" />
+                          <Text style={[styles.badgeText, styles.badgeTextChurch]}>Food by church</Text>
+                        </View>
+                      )}
+                      {providedFlower && (
+                        <View style={[styles.badge, styles.badgeChurch]}>
+                          <Ionicons name="flower-outline" size={12} color="#FFFFFF" />
+                          <Text style={[styles.badgeText, styles.badgeTextChurch]}>Flowers by church</Text>
+                        </View>
+                      )}
                       {hasMeal && (
                         <View style={styles.badge}>
                           <Ionicons name="restaurant-outline" size={12} color={theme.colors.accent} />
@@ -236,7 +298,7 @@ const SignupsScreen = ({ navigation }) => {
                           <Text style={styles.badgeText}>Flowers</Text>
                         </View>
                       )}
-                      {!hasMeal && !hasFlower && (
+                      {!hasMeal && !hasFlower && !providedMeal && !providedFlower && (
                         <Text style={styles.badgeEmpty}>No sign-ups yet</Text>
                       )}
                     </View>
@@ -281,6 +343,14 @@ const SignupsScreen = ({ navigation }) => {
 const makeStyles = (theme) => StyleSheet.create({
   centered: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing.xl,
+  },
+  // Same look, but as a scroll content container — flex: 1 there pins the
+  // content to the viewport height instead of letting it fill and stay pullable.
+  centeredScroll: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: theme.spacing.xl,
@@ -339,6 +409,8 @@ const makeStyles = (theme) => StyleSheet.create({
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    // Two church badges are wider than one phone line
+    flexWrap: 'wrap',
     marginTop: theme.spacing.xs,
   },
   badge: {
@@ -350,11 +422,21 @@ const makeStyles = (theme) => StyleSheet.create({
     paddingVertical: 2,
     marginRight: theme.spacing.xs,
   },
+  // Filled rather than the tinted pill: this is a different kind of fact from a
+  // pledge count, and it should read as such at a glance down the list.
+  badgeChurch: {
+    backgroundColor: theme.colors.accent,
+    marginTop: 2,
+  },
   badgeText: {
     fontSize: theme.fonts.sizes.xs,
     fontWeight: '600',
     color: theme.colors.accent,
     marginLeft: 4,
+  },
+  badgeTextChurch: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   badgeEmpty: {
     fontSize: theme.fonts.sizes.xs,

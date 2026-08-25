@@ -66,7 +66,7 @@ const ContactScreen = ({ navigation }) => {
 
   return (
     <View style={commonStyles.container}>
-      <ScreenHeader title="Contact" onBack={() => navigation.goBack()} />
+      <ScreenHeader title="Administration" onBack={() => navigation.goBack()} />
 
       {loading ? (
         <View style={styles.centered}>

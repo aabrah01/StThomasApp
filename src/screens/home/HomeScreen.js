@@ -18,7 +18,7 @@ const HomeScreen = ({ navigation }) => {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { member, appSettings } = useAuth();
+  const { user, member, appSettings } = useAuth();
   const { markScreenReady } = useDataReady();
 
   // Home renders straight from AuthContext — nothing to wait for
@@ -28,8 +28,12 @@ const HomeScreen = ({ navigation }) => {
 
   const cards = useMemo(() => visibleCards(HOME_CARDS, appSettings), [appSettings]);
 
-  // Admins are allowed to sign in without a member record, so there may be no name
+  // Admins are allowed to sign in without a member record, so there may be no
+  // name — fall back to the email rather than leaving the hero half-empty
   const fullName = [member?.firstName, member?.lastName].filter(Boolean).join(' ');
+  const greeting = fullName || user?.email || '';
+  // An email at name size wraps awkwardly, so set it a step down
+  const greetingIsEmail = !fullName && !!user?.email;
 
   return (
     <View style={styles.container}>
@@ -37,8 +41,13 @@ const HomeScreen = ({ navigation }) => {
       <View style={[styles.hero, { paddingTop: insets.top + theme.spacing.md }]}>
         <View style={styles.heroText}>
           <Text style={styles.welcome}>Welcome</Text>
-          {fullName ? (
-            <Text style={styles.name} numberOfLines={2}>{fullName}</Text>
+          {greeting ? (
+            <Text
+              style={[styles.name, greetingIsEmail && styles.nameEmail]}
+              numberOfLines={2}
+            >
+              {greeting}
+            </Text>
           ) : null}
         </View>
         <TouchableOpacity
@@ -114,6 +123,9 @@ const makeStyles = (theme) => StyleSheet.create({
     fontSize: theme.fonts.sizes.xxl,
     fontWeight: '700',
     color: theme.dark ? theme.colors.text : '#FFFFFF',
+  },
+  nameEmail: {
+    fontSize: theme.fonts.sizes.lg,
   },
   // Cream disc behind the crest: its outer ring is the same burgundy as the
   // hero, so without this it reads as a floating blob with no edge.

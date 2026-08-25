@@ -34,3 +34,9 @@ export const SUCCESS_MESSAGES = {
   PASSWORD_RESET_SENT: 'Password reset email sent. Please check your inbox.',
   LOGOUT_SUCCESS: 'Successfully logged out.',
 };
+
+// Family photos are shown landscape (Profile leads with one at this ratio), so
+// the crop UI frames them the same way — what you frame is what you get.
+export const FAMILY_PHOTO_ASPECT = 1.4;
+// expo-image-picker wants an integer pair; 7:5 is the same 1.4
+export const FAMILY_PHOTO_ASPECT_PAIR = [7, 5];
