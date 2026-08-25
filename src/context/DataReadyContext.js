@@ -3,7 +3,10 @@ import * as SplashScreen from 'expo-splash-screen';
 
 const DataReadyContext = createContext({ markScreenReady: () => {} });
 
-const SCREENS = ['directory', 'calendar', 'profile'];
+// Home is the landing screen and renders straight from AuthContext, so it alone
+// gates the splash. Profile is no longer a tab and never mounts at startup —
+// leaving it here would make every cold start wait for the 6s timeout.
+const SCREENS = ['home'];
 
 export const DataReadyProvider = ({ children }) => {
   const readyRef = useRef(new Set());

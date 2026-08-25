@@ -78,6 +78,13 @@ export const AuthProvider = ({ children }) => {
     return { error };
   };
 
+  // Pull-to-refresh calls this so admin-side feature-flag changes take effect
+  // without a restart — settings are otherwise only read at sign-in.
+  const refreshAppSettings = async () => {
+    const { data } = await databaseService.getAppSettings();
+    if (data) setAppSettings(data);
+  };
+
   const isAdmin = () => {
     return userRole?.role === 'admin';
   };
@@ -93,6 +100,7 @@ export const AuthProvider = ({ children }) => {
     verifyPin,
     signOut,
     isAdmin,
+    refreshAppSettings,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

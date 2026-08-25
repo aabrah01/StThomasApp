@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import databaseService from '../../services/databaseService';
 import FamilyCard from '../../components/directory/FamilyCard';
 import ErrorMessage from '../../components/common/ErrorMessage';
+import ScreenHeader from '../../components/common/ScreenHeader';
 import { useTheme } from '../../hooks/useTheme';
 import { useCommonStyles } from '../../styles/commonStyles';
 
@@ -68,24 +69,41 @@ const DirectoryListScreen = ({ navigation }) => {
     markScreenReady('directory');
   };
 
+  // Everything about a family, flattened into one string to search
+  const haystackFor = (f) =>
+    [
+      f.familyName,
+      f.membershipId,
+      ...(f.memberFirstNames || []),
+      ...(f.memberLastNames || []),
+      ...(f.memberAliases || []),
+      ...(f.memberPhoneNumbers || []),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
   const filterFamilies = () => {
-    if (!searchQuery.trim()) {
+    // Split on whitespace so "john smith" and "smith john" both work, and a
+    // stray trailing space doesn't kill the match
+    const tokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) {
       setFilteredFamilies(families);
       return;
     }
-    const query = searchQuery.toLowerCase();
-    const queryDigits = query.replace(/\D/g, '');
+
     setFilteredFamilies(
-      families.filter((f) =>
-        f.familyName.toLowerCase().includes(query) ||
-        (f.memberFirstNames && f.memberFirstNames.some(n => n.toLowerCase().includes(query))) ||
-        (f.memberAliases && f.memberAliases.some(a => a.toLowerCase().includes(query))) ||
-        (f.membershipId && f.membershipId.toLowerCase().includes(query)) ||
-        (f.memberPhoneNumbers && f.memberPhoneNumbers.some(p =>
-          p.toLowerCase().includes(query) ||
-          (queryDigits && p.replace(/\D/g, '').includes(queryDigits))
-        ))
-      )
+      families.filter((f) => {
+        const haystack = haystackFor(f);
+        const haystackDigits = haystack.replace(/\D/g, '');
+        // Every token has to appear somewhere — narrowing, not widening
+        return tokens.every((token) => {
+          if (haystack.includes(token)) return true;
+          // Digits-only fallback so "5165550101" finds "(516) 555-0101"
+          const tokenDigits = token.replace(/\D/g, '');
+          return tokenDigits.length > 0 && haystackDigits.includes(tokenDigits);
+        });
+      })
     );
   };
 
@@ -105,6 +123,7 @@ const DirectoryListScreen = ({ navigation }) => {
 
   return (
     <View style={commonStyles.container}>
+      <ScreenHeader title="Directory" onBack={() => navigation.goBack()} />
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={18} color={theme.colors.textLight} style={styles.searchIcon} />
         <TextInput

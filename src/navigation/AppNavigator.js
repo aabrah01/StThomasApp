@@ -1,120 +1,61 @@
-import React, { useEffect } from 'react';
-import { Ionicons } from '@expo/vector-icons';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, StyleSheet } from 'react-native';
+import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import * as SplashScreen from 'expo-splash-screen';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../hooks/useTheme';
+import BottomBar from '../components/common/BottomBar';
 
 import LoginScreen from '../screens/auth/LoginScreen';
 import PinVerifyScreen from '../screens/auth/PinVerifyScreen';
+import HomeScreen from '../screens/home/HomeScreen';
+import GivingScreen from '../screens/giving/GivingScreen';
 import DirectoryListScreen from '../screens/directory/DirectoryListScreen';
 import FamilyDetailScreen from '../screens/directory/FamilyDetailScreen';
 import CalendarScreen from '../screens/calendar/CalendarScreen';
 import EventDetailScreen from '../screens/calendar/EventDetailScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import SignupsScreen from '../screens/signups/SignupsScreen';
+import MediaScreen from '../screens/media/MediaScreen';
+import ContactScreen from '../screens/contact/ContactScreen';
 import DocumentsScreen from '../screens/documents/DocumentsScreen';
 import DocumentViewerScreen from '../screens/documents/DocumentViewerScreen';
-import HeaderMenu from '../components/common/HeaderMenu';
 
 const Stack = createStackNavigator();
-const Tab = createBottomTabNavigator();
 
-const TabIcon = ({ name, focused }) => {
-  const theme = useTheme();
-  return (
-    <Ionicons
-      name={focused ? name : `${name}-outline`}
-      size={24}
-      color={focused ? theme.colors.accent : theme.colors.textLight}
-    />
-  );
-};
-
-// All three tabs share this Tab Navigator — no nested stacks, so headers are identical
-const MainTabs = () => {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
-  const tabBarHeight = 56 + insets.bottom;
-
-  return (
-    <Tab.Navigator
-      screenOptions={{
-        lazy: false,
-        tabBarActiveTintColor: theme.colors.accent,
-        tabBarInactiveTintColor: theme.colors.textLight,
-        tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopWidth: 1,
-          borderTopColor: theme.colors.border,
-          paddingBottom: insets.bottom || 8,
-          paddingTop: 8,
-          height: tabBarHeight,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          marginTop: 2,
-        },
-        headerStyle: {
-          backgroundColor: theme.colors.surface,
-          shadowColor: 'transparent',
-          elevation: 0,
-          borderBottomWidth: 1,
-          borderBottomColor: theme.colors.border,
-        },
-        headerTintColor: theme.colors.text,
-        headerTitleStyle: {
-          fontWeight: '700',
-          fontSize: theme.fonts.sizes.lg,
-        },
-        headerTitleAlign: 'center',
-        headerRight: () => <HeaderMenu />,
-      }}
-    >
-      <Tab.Screen
-        name="Directory"
-        component={DirectoryListScreen}
-        options={{
-          title: 'St. Thomas LI Directory',
-          tabBarLabel: 'Directory',
-          tabBarIcon: ({ focused }) => <TabIcon name="people" focused={focused} />,
-        }}
-      />
-      <Tab.Screen
-        name="Calendar"
-        component={CalendarScreen}
-        options={{
-          title: 'St. Thomas LI Events',
-          tabBarLabel: 'Calendar',
-          tabBarIcon: ({ focused }) => <TabIcon name="calendar" focused={focused} />,
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          title: 'My Profile',
-          tabBarLabel: 'Profile',
-          tabBarIcon: ({ focused }) => <TabIcon name="person" focused={focused} />,
-        }}
-      />
-    </Tab.Navigator>
-  );
-};
-
-// Root stack wraps the tabs so FamilyDetail can slide in over them without
-// any nested navigator affecting the tab header heights
+// Every screen lives in one stack, so they all get the same interactive
+// swipe-back. The bottom bar is a plain component rendered alongside the
+// navigator rather than a tab navigator — a tab has nothing beneath it to pop to.
 const AppStack = () => {
   const theme = useTheme();
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: theme.colors.background } }}>
-      <Stack.Screen name="MainTabs" component={MainTabs} />
+    <Stack.Navigator
+      initialRouteName="Home"
+      screenOptions={{
+        headerShown: false,
+        gestureEnabled: true,
+        gestureDirection: 'horizontal',
+        cardStyle: { backgroundColor: theme.colors.background },
+      }}
+    >
+      {/* Hub */}
+      <Stack.Screen name="Home" component={HomeScreen} options={{ gestureEnabled: false }} />
+
+      {/* Menu destinations */}
+      <Stack.Screen name="Directory" component={DirectoryListScreen} />
+      <Stack.Screen name="Events" component={CalendarScreen} />
+      <Stack.Screen name="Giving" component={GivingScreen} />
+      <Stack.Screen name="Signups" component={SignupsScreen} />
+      <Stack.Screen name="Media" component={MediaScreen} />
+      <Stack.Screen name="Contact" component={ContactScreen} />
+      <Stack.Screen name="Documents" component={DocumentsScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+
+      {/* Drill-downs */}
       <Stack.Screen name="FamilyDetail" component={FamilyDetailScreen} />
       <Stack.Screen name="EventDetail" component={EventDetailScreen} />
-      <Stack.Screen name="Documents" component={DocumentsScreen} />
       <Stack.Screen name="DocumentViewer" component={DocumentViewerScreen} />
     </Stack.Navigator>
   );
@@ -133,10 +74,16 @@ const AuthStack = () => {
 const AppNavigator = () => {
   const { user, loading } = useAuth();
   const theme = useTheme();
+  const navigationRef = useNavigationContainerRef();
+  const [routeName, setRouteName] = useState('Home');
+
+  const trackRoute = useCallback(() => {
+    setRouteName(navigationRef.getCurrentRoute()?.name ?? 'Home');
+  }, [navigationRef]);
 
   useEffect(() => {
     // For the unauthenticated path (login screen) dismiss the splash immediately.
-    // For authenticated users, DataReadyContext dismisses it once all 3 screens have data.
+    // For authenticated users, DataReadyContext dismisses it once Home has data.
     if (!loading && !user) {
       SplashScreen.hideAsync().catch(() => {});
     }
@@ -148,6 +95,9 @@ const AppNavigator = () => {
 
   return (
     <NavigationContainer
+      ref={navigationRef}
+      onReady={trackRoute}
+      onStateChange={trackRoute}
       theme={{
         dark: theme.dark,
         colors: {
@@ -160,9 +110,33 @@ const AppNavigator = () => {
         },
       }}
     >
-      {user ? <AppStack /> : <AuthStack />}
+      {/* Signed in, every screen has a burgundy header — light icons. The auth
+          screens sit on cream, where light icons would be invisible. */}
+      <StatusBar style={user ? 'light' : 'auto'} />
+      <View style={styles.shell}>
+        <View style={styles.content}>
+          {user ? <AppStack /> : <AuthStack />}
+        </View>
+        {user && (
+          <BottomBar
+            current={routeName}
+            // navigate (not push) returns to an existing screen instead of
+            // stacking duplicates, so the history stays shallow
+            onSelect={(name) => navigationRef.navigate(name)}
+          />
+        )}
+      </View>
     </NavigationContainer>
   );
 };
+
+const styles = StyleSheet.create({
+  shell: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+  },
+});
 
 export default AppNavigator;

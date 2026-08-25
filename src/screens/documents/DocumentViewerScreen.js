@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import documentsService from '../../services/documentsService';
 import ErrorMessage from '../../components/common/ErrorMessage';
+import ScreenHeader from '../../components/common/ScreenHeader';
 import { useTheme } from '../../hooks/useTheme';
 
 const DocumentViewerScreen = ({ route, navigation }) => {
@@ -53,28 +54,24 @@ const DocumentViewerScreen = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{doc.name}</Text>
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={handleShare}
-          disabled={!localUri}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          {sharing ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Ionicons name="share-outline" size={24} color={localUri ? '#FFFFFF' : 'rgba(255,255,255,0.4)'} />
-          )}
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title={doc.name}
+        onBack={() => navigation.goBack()}
+        right={
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={handleShare}
+            disabled={!localUri}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            {sharing ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Ionicons name="share-outline" size={24} color={localUri ? '#FFFFFF' : 'rgba(255,255,255,0.4)'} />
+            )}
+          </TouchableOpacity>
+        }
+      />
 
       <View style={styles.body}>
         {loading ? (
@@ -102,16 +99,6 @@ const makeStyles = (theme) => StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  header: {
-    backgroundColor: theme.colors.sapphire,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 56,
-    paddingBottom: theme.spacing.md,
-    paddingHorizontal: theme.spacing.md,
-    elevation: 0,
-    shadowColor: 'transparent',
-  },
   headerButton: {
     width: 48,
     height: 48,
@@ -119,14 +106,6 @@ const makeStyles = (theme) => StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    color: '#FFFFFF',
-    fontSize: theme.fonts.sizes.lg,
-    fontWeight: '700',
-    marginHorizontal: theme.spacing.sm,
   },
   body: {
     flex: 1,

@@ -4,6 +4,13 @@ import { STORAGE_KEYS } from '../utils/constants';
 import { isDemoSession } from '../utils/config';
 import { demoEvents } from '../utils/demoData';
 
+// Local YYYY-MM-DD — toISOString() would shift the date across UTC
+const toDateString = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// Ceiling on how many days one event may span, so bad data can't hang the loop
+const MAX_EVENT_DAYS = 366;
+
 class CalendarService {
   constructor() {
     this.calendarId = null;
@@ -35,7 +42,9 @@ class CalendarService {
         timeMax: timeMax || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days
         singleEvents: true,
         orderBy: 'startTime',
-        maxResults: 100,
+        // A busy parish calendar overruns 100 inside a 90-day window, and the
+        // overflow is silently dropped. Google allows up to 2500.
+        maxResults: 250,
       };
 
       const response = await axios.get(
@@ -101,11 +110,48 @@ class CalendarService {
     }
   }
 
-  getEventsByDate(events, date) {
-    // Compare the ISO date prefix directly (YYYY-MM-DD) to avoid UTC vs local
-    // timezone mismatches that occur when passing date strings through new Date()
-    return events.filter(event => event.startDate.startsWith(date));
+  // First and last day an event actually covers, inclusive, as YYYY-MM-DD.
+  //
+  // Google returns all-day events with an EXCLUSIVE end date — a Friday-to-Sunday
+  // event ends on Monday — so the real last day is one before it. Timed events
+  // use the actual finish, which is inclusive, so a 9pm–1am event spans two days.
+  eventDateRange(event) {
+    const start = event.startDate.split('T')[0];
+    if (!event.endDate) return { start, end: start };
+
+    let end = event.endDate.split('T')[0];
+    if (event.isAllDay) {
+      const d = new Date(`${end}T00:00:00`);
+      d.setDate(d.getDate() - 1);
+      end = toDateString(d);
+    }
+    // Malformed data shouldn't produce a backwards range
+    return { start, end: end < start ? start : end };
   }
+
+  // Every day an event covers — used to mark the calendar
+  eventDates(event) {
+    const { start, end } = this.eventDateRange(event);
+    const dates = [];
+    const cursor = new Date(`${start}T00:00:00`);
+    const last = new Date(`${end}T00:00:00`);
+    // Guard against a bad end date spinning this forever
+    while (cursor <= last && dates.length < MAX_EVENT_DAYS) {
+      dates.push(toDateString(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return dates;
+  }
+
+  getEventsByDate(events, date) {
+    // Compare ISO date prefixes directly (YYYY-MM-DD) to avoid UTC vs local
+    // timezone mismatches that occur when passing date strings through new Date()
+    return events.filter(event => {
+      const { start, end } = this.eventDateRange(event);
+      return date >= start && date <= end;
+    });
+  }
+
 }
 
 export default new CalendarService();

@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import ScreenHeader from '../../components/common/ScreenHeader';
 import { useTheme } from '../../hooks/useTheme';
 
 const EventDetailScreen = ({ route, navigation }) => {
@@ -65,18 +66,7 @@ const EventDetailScreen = ({ route, navigation }) => {
     <View style={styles.container}>
 
       {/* Header — matches FamilyDetailScreen exactly */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>Event Details</Text>
-        {/* Invisible spacer keeps title centred */}
-        <View style={styles.headerSpacer} />
-      </View>
+      <ScreenHeader title="Event Details" onBack={() => navigation.goBack()} />
 
       <ScrollView
         style={styles.scroll}
@@ -151,34 +141,6 @@ const makeStyles = (theme) => StyleSheet.create({
   },
 
   /* ── Header (mirrors FamilyDetailScreen pattern) ── */
-  header: {
-    backgroundColor: theme.colors.sapphire,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 56,
-    paddingBottom: theme.spacing.md,
-    paddingHorizontal: theme.spacing.md,
-    elevation: 0,
-    shadowColor: 'transparent',
-  },
-  backButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerSpacer: {
-    width: 48,
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    color: '#FFFFFF',
-    fontSize: theme.fonts.sizes.lg,
-    fontWeight: '700',
-  },
 
   /* ── Content ── */
   scroll: {

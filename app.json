@@ -2,7 +2,7 @@
   "expo": {
     "name": "StThomasLI",
     "slug": "st-thomas-app",
-    "version": "1.0.9",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
