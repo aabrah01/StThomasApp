@@ -49,6 +49,10 @@ function StatementDocument({ data }: { data: StatementData }) {
     acc[c.category] = (acc[c.category] ?? 0) + c.amount;
     return acc;
   }, {});
+  // A category with a requested amount still shows, at $0, when nothing was given to it
+  Object.keys(categoryAmounts).forEach(category => {
+    byCategory[category] ??= 0;
+  });
   const categories = Object.keys(byCategory).sort((a, b) => (categoryAmounts[b] ?? -1) - (categoryAmounts[a] ?? -1) || a.localeCompare(b));
   const total = contributions.reduce((s, c) => s + c.amount, 0);
   const hasRequested = categories.some(c => categoryAmounts[c] != null);

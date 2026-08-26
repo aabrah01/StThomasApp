@@ -278,12 +278,16 @@ const FamilyDetailScreen = ({ route, navigation }) => {
           <MemberList members={members} />
         </View>
 
-        {isAdmin() && contributions.length > 0 && (() => {
+        {isAdmin() && (contributions.length > 0 || Object.keys(categoryAmounts).length > 0) && (() => {
           const ytdTotal = contributions.reduce((sum, c) => sum + c.amount, 0);
           const byCategory = contributions.reduce((acc, c) => {
             acc[c.category] = (acc[c.category] || 0) + c.amount;
             return acc;
           }, {});
+          // A category with a requested amount still shows, at $0, when nothing was given to it
+          Object.keys(categoryAmounts).forEach(category => {
+            if (byCategory[category] == null) byCategory[category] = 0;
+          });
           const sortedCategories = Object.entries(byCategory).sort(
             ([a], [b]) => (categoryAmounts[b] ?? -1) - (categoryAmounts[a] ?? -1) || a.localeCompare(b)
           );

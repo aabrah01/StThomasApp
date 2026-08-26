@@ -20,6 +20,7 @@ export default async function EditFamilyPage({ params }: { params: Promise<{ id:
   } | null = null;
 
   let contributions: { id: string; date: string; amount: number; category: string }[] = [];
+  let categoryAmounts: Record<string, number> = {};
   let statementYear = new Date().getFullYear();
 
   if (DEMO_MODE) {
@@ -37,12 +38,13 @@ export default async function EditFamilyPage({ params }: { params: Promise<{ id:
     };
   } else {
     const supabase = createAdminSupabase();
-    const [{ data: f }, { data: m }, { data: contribs }, { data: settings }] = await Promise.all([
+    const [{ data: f }, { data: m }, { data: contribs }, { data: settings }, { data: amounts }] = await Promise.all([
       supabase.from('families').select('*').eq('id', id).single(),
       supabase.from('members').select('*').eq('family_id', id).order('first_name'),
       supabase.from('contributions').select('id, date, amount, category')
         .eq('family_id', id).order('date', { ascending: false }),
       supabase.from('contribution_settings').select('asof_date').eq('id', 1).single(),
+      supabase.from('contribution_category_amounts').select('category, requested_amount'),
     ]);
     if (!f) notFound();
     family = {
@@ -59,6 +61,7 @@ export default async function EditFamilyPage({ params }: { params: Promise<{ id:
       id: c.id, date: c.date, amount: Number(c.amount), category: c.category,
     }));
     if (settings?.asof_date) statementYear = new Date(`${settings.asof_date}T00:00:00`).getFullYear();
+    categoryAmounts = Object.fromEntries((amounts ?? []).map(a => [a.category, Number(a.requested_amount)]));
   }
 
   return (
@@ -71,7 +74,11 @@ export default async function EditFamilyPage({ params }: { params: Promise<{ id:
       <h1 className="text-2xl font-bold text-gray-900 mb-6">{family.familyName}</h1>
       <FamilyForm family={family} />
       <div className="mt-6 space-y-6">
-        <FamilyContributionsSection contributions={contributions} />
+        <FamilyContributionsSection
+          contributions={contributions}
+          categoryAmounts={categoryAmounts}
+          requestedYear={statementYear}
+        />
         <GenerateStatementForm
           familyId={family.id}
           familyName={family.familyName}

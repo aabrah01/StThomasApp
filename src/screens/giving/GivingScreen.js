@@ -98,6 +98,10 @@ const GivingScreen = ({ navigation }) => {
     acc[c.category] = (acc[c.category] || 0) + c.amount;
     return acc;
   }, {});
+  // A category with a requested amount still shows, at $0, when nothing was given to it
+  Object.keys(categoryAmounts).forEach(category => {
+    if (byCategory[category] == null) byCategory[category] = 0;
+  });
   const sortedCategories = Object.entries(byCategory).sort(
     ([a], [b]) => (categoryAmounts[b] ?? -1) - (categoryAmounts[a] ?? -1) || a.localeCompare(b)
   );
@@ -106,7 +110,7 @@ const GivingScreen = ({ navigation }) => {
     <View style={commonStyles.container}>
     <ScreenHeader title="My Giving" onBack={() => navigation.goBack()} />
     <ScrollView style={commonStyles.container} contentContainerStyle={styles.content}>
-      {canViewGiving && contributions.length > 0 && (
+      {canViewGiving && sortedCategories.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{givingYear} YTD Giving As Of {asofLabel}</Text>
 
@@ -158,7 +162,7 @@ const GivingScreen = ({ navigation }) => {
         </View>
       )}
 
-      {canViewGiving && contributions.length === 0 && (
+      {canViewGiving && sortedCategories.length === 0 && (
         <View style={styles.note}>
           <Text style={styles.noteText}>
             No contributions are recorded for {givingYear} yet. Giving is imported from the
