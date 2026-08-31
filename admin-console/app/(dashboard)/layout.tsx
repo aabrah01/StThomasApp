@@ -16,6 +16,7 @@ const navItems = [
   { href: '/meal-signups',   label: 'Meal Signups',    icon: '🍽️' },
   { href: '/flower-signups', label: 'Flower Signups',  icon: '🌸' },
   { href: '/users',          label: 'Users & Roles',   icon: '🔑' },
+  { href: '/errors',         label: 'App Errors',      icon: '⚠️' },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

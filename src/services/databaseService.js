@@ -7,6 +7,8 @@
  */
 import { supabase } from '../../supabase.config';
 import { isDemoSession } from '../utils/config';
+import { logClientError } from './errorLogger';
+import { buildInfo, getDeviceId } from '../utils/buildInfo';
 import {
   demoFamilies,
   demoMembers,
@@ -43,9 +45,13 @@ const notifySignup = async (kind, action, memberId, eventDate, eventId) => {
     const { error } = await supabase.functions.invoke('notify-signup', {
       body: { kind, action, memberId, eventDate, eventId },
     });
-    if (error) console.warn('[signup notify] not sent:', error.message);
+    if (error) {
+      console.warn('[signup notify] not sent:', error.message);
+      logClientError('signup.notify', error, { kind, action });
+    }
   } catch (err) {
     console.warn('[signup notify] not sent:', err);
+    logClientError('signup.notify', err, { kind, action });
   }
 };
 
@@ -262,6 +268,32 @@ class DatabaseService {
       .upsert({ user_id: userId, member_id: memberId }, { onConflict: 'user_id,member_id' });
 
     return { error: error?.message ?? null };
+  }
+
+  // Records which build this member is running on this device, for the Users &
+  // Roles column. Fire-and-forget: called on every launch, and a failure here
+  // must never keep anyone out of the app.
+  async recordAppLaunch() {
+    if (isDemoSession() || !supabase) return;
+
+    try {
+      const deviceId = await getDeviceId();
+      if (!deviceId) return;
+
+      const info = buildInfo();
+      const { error } = await supabase.rpc('record_app_launch', {
+        p_device_id: deviceId,
+        p_app_version: info.app_version,
+        p_update_id: info.update_id,
+        p_update_created_at: info.update_created_at,
+        p_platform: info.platform,
+        p_os_version: info.os_version,
+      });
+
+      if (error) console.warn('[app launch] not recorded:', error.message);
+    } catch (err) {
+      console.warn('[app launch] not recorded:', err);
+    }
   }
 
   async getUserRole(userId) {

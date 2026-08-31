@@ -59,3 +59,17 @@ export interface UserRole {
   role: 'admin' | 'member';
   email?: string;
 }
+
+export interface ClientError {
+  id: string;
+  email: string;
+  memberName: string | null;
+  appVersion: string | null;
+  updateId: string | null;
+  platform: string | null;
+  osVersion: string | null;
+  operation: string;
+  message: string;
+  context: Record<string, unknown> | null;
+  createdAt: string;
+}

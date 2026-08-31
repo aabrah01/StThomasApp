@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import authService from '../services/authService';
 import databaseService from '../services/databaseService';
+import { logClientError } from '../services/errorLogger';
 
 const AuthContext = createContext({});
 
@@ -31,13 +32,26 @@ export const AuthProvider = ({ children }) => {
         }
 
         if (!memberData && roleData?.role !== 'admin') {
-          // No matching member record and not an admin — reject access
+          // No matching member record and not an admin — reject access.
+          //
+          // Logged first, and awaited unlike every other logClientError call:
+          // signOut destroys the session, and the insert policy needs auth.uid().
+          //
+          // Reaching here means the session outlived the member record — the row
+          // was deleted while the app held a persisted session, so the next cold
+          // start bounces them. A wrong or unknown email cannot get this far:
+          // request-login-pin rejects it with a 404 before any code is sent, and
+          // that rejection is invisible until the Edge Function logs it itself.
+          await logClientError('auth.noMemberRecord', new Error('Signed in with no member record'));
           await authService.signOut();
           setAuthError('Your account is not registered as a church member. Please contact the church office.');
           // Don't set loading=false here — signOut triggers onAuthStateChange again with null,
           // which will hit the else branch below and set loading=false
           return;
         }
+
+        // Not awaited — recording the build must not delay showing the app.
+        databaseService.recordAppLaunch();
 
         const { data: settingsData } = await databaseService.getAppSettings();
         setUser(authUser);

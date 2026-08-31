@@ -1,4 +1,4 @@
-import type { Family, Member, Contribution } from './types';
+import type { Family, Member, Contribution, ClientError } from './types';
 
 export const DEMO_FAMILIES: Family[] = [
   { id: 'family1', familyName: 'Johnson Family',  membershipId: 'MEM001', email: 'johnson@example.com',  phone: '(555) 123-4567', address: '123 Oak Street, Springfield, IL 62701',  photoUrl: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=600&q=80' },
@@ -37,3 +37,47 @@ export const DEMO_USERS = [
   { id: 'user1', email: 'admin@stthomas.org',    role: 'admin',  lastSignIn: '2026-03-24T10:00:00Z' },
   { id: 'user2', email: 'john.johnson@example.com', role: 'member', lastSignIn: '2026-03-20T09:00:00Z' },
 ];
+
+export const DEMO_CLIENT_ERRORS: ClientError[] = [
+  {
+    id: 'err1',
+    email: 'john.johnson@example.com',
+    memberName: 'John Johnson',
+    appVersion: '1.1.0',
+    updateId: null,
+    platform: 'ios',
+    osVersion: '18.2',
+    operation: 'documents.list',
+    message: 'Request failed with status code 403',
+    context: { status: 403 },
+    createdAt: '2026-03-24T14:12:00Z',
+  },
+  {
+    id: 'err2',
+    email: 'mary.mathew@example.com',
+    memberName: 'Mary Mathew',
+    appVersion: '1.0.0',
+    updateId: null,
+    platform: 'android',
+    osVersion: '34',
+    operation: 'calendar.fetchEvents',
+    message: 'Network request failed',
+    context: { servedFromCache: true },
+    createdAt: '2026-03-23T09:40:00Z',
+  },
+];
+
+// Keyed by DEMO_USERS id — user2 has two devices so the expandable row shows.
+export const DEMO_DEVICES: Record<string, {
+  deviceId: string; appVersion: string | null; updateId: string | null;
+  updateCreatedAt: string | null; platform: string | null;
+  osVersion: string | null; lastSeenAt: string;
+}[]> = {
+  user1: [
+    { deviceId: 'dev-a', appVersion: '1.0.0', updateId: null, updateCreatedAt: null, platform: 'android', osVersion: '34', lastSeenAt: '2026-03-24T10:00:00Z' },
+  ],
+  user2: [
+    { deviceId: 'dev-b', appVersion: '1.1.0', updateId: '9f3c1a72-5d84-4e19-b0c6-71a2ee5d4413', updateCreatedAt: '2026-08-12T10:00:00Z', platform: 'ios', osVersion: '18.2', lastSeenAt: '2026-03-20T09:00:00Z' },
+    { deviceId: 'dev-c', appVersion: '1.0.0', updateId: null, updateCreatedAt: null, platform: 'ios', osVersion: '17.4', lastSeenAt: '2026-02-11T18:02:00Z' },
+  ],
+};

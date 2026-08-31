@@ -1,26 +1,43 @@
 import { createAdminSupabase } from '@/lib/supabase';
-import { DEMO_USERS } from '@/lib/demoData';
-import UsersClient from './UsersClient';
+import { DEMO_USERS, DEMO_DEVICES } from '@/lib/demoData';
+import UsersClient, { type UserRow } from './UsersClient';
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
 export const dynamic = 'force-dynamic';
 
 export default async function UsersPage() {
-  let rows: {
-    id: string; email: string; role: string; lastSignIn: string | null;
-    memberId: string | null; memberName: string | null; isHoh: boolean;
-  }[];
+  let rows: UserRow[];
 
   if (DEMO_MODE) {
-    rows = DEMO_USERS.map(u => ({ ...u, memberId: null, memberName: null, isHoh: false }));
+    rows = DEMO_USERS.map(u => ({
+      ...u, memberId: null, memberName: null, isHoh: false,
+      devices: DEMO_DEVICES[u.id] ?? [],
+    }));
   } else {
     const supabase = createAdminSupabase();
-    const [{ data: { users } }, { data: roles }, { data: members }] = await Promise.all([
+    const [{ data: { users } }, { data: roles }, { data: members }, { data: installs }] = await Promise.all([
       supabase.auth.admin.listUsers({ perPage: 1000 }),
       supabase.from('user_roles').select('*'),
       supabase.from('members').select('id, first_name, last_name, email, is_head_of_household'),
+      supabase.from('client_installs').select('*').order('last_seen_at', { ascending: false }),
     ]);
+
+    // Most recently used device first, so the row summary reads off devices[0].
+    const devicesByUser = new Map<string, UserRow['devices']>();
+    for (const i of installs ?? []) {
+      const list = devicesByUser.get(i.user_id) ?? [];
+      list.push({
+        deviceId: i.device_id,
+        appVersion: i.app_version,
+        updateId: i.update_id,
+        updateCreatedAt: i.update_created_at,
+        platform: i.platform,
+        osVersion: i.os_version,
+        lastSeenAt: i.last_seen_at,
+      });
+      devicesByUser.set(i.user_id, list);
+    }
     const roleMap = new Map((roles ?? []).map(r => [r.user_id, r.role]));
     const memberByEmail = new Map(
       (members ?? []).map(m => [m.email?.toLowerCase() ?? '', m])
@@ -35,6 +52,7 @@ export default async function UsersPage() {
         memberId: member?.id ?? null,
         memberName: member ? `${member.first_name} ${member.last_name}` : null,
         isHoh: member?.is_head_of_household ?? false,
+        devices: devicesByUser.get(u.id) ?? [],
       };
     });
   }

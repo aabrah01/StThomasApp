@@ -2,6 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../utils/constants';
 import { isDemoSession } from '../utils/config';
+import { logClientError } from './errorLogger';
 import { demoEvents } from '../utils/demoData';
 
 // Local YYYY-MM-DD — toISOString() would shift the date across UTC
@@ -61,6 +62,9 @@ class CalendarService {
       console.error('Error fetching calendar events:', error);
 
       const cachedEvents = await this.getCachedEvents();
+      // Worth logging even when the cache saves the screen: the member sees a
+      // calendar that looks fine while the sync has been failing for days.
+      logClientError('calendar.fetchEvents', error, { servedFromCache: !!cachedEvents });
       if (cachedEvents) {
         return { data: cachedEvents, error: 'Using cached events. Network error occurred.' };
       }

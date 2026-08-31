@@ -1,8 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
-interface User {
+export interface Device {
+  deviceId: string;
+  appVersion: string | null;
+  updateId: string | null;
+  updateCreatedAt: string | null;
+  platform: string | null;
+  osVersion: string | null;
+  lastSeenAt: string;
+}
+
+export interface UserRow {
   id: string;
   email: string;
   role: string;
@@ -10,10 +20,84 @@ interface User {
   memberId: string | null;
   memberName: string | null;
   isHoh: boolean;
+  devices: Device[];
 }
 
-export default function UsersClient({ users: initial }: { users: User[] }) {
+// Sentinels for the filter — distinct from any real version string.
+const NEVER_OPENED = '__never__';
+const BEHIND = '__behind__';
+
+// Short OTA publish date, e.g. "Aug 12".
+const otaLabel = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : null;
+
+// Numeric compare on dot-separated parts, so 1.10.0 sorts above 1.9.0 (which a
+// plain string compare gets wrong).
+const compareVersions = (a: string, b: string) => {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+};
+
+const platformLabel = (d: Device) =>
+  [d.platform === 'ios' ? 'iOS' : d.platform === 'android' ? 'Android' : d.platform, d.osVersion]
+    .filter(Boolean)
+    .join(' ');
+
+export default function UsersClient({ users: initial }: { users: UserRow[] }) {
   const [users, setUsers] = useState(initial);
+  const [versionFilter, setVersionFilter] = useState('');
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  // "Stale" is measured against the highest version anyone has reported, so no
+  // release number has to be hardcoded here.
+  const { versions, latestVersion } = useMemo(() => {
+    const all = users
+      .flatMap(u => u.devices.map(d => d.appVersion))
+      .filter((v): v is string => !!v);
+    const unique = Array.from(new Set(all)).sort(compareVersions).reverse();
+    return { versions: unique, latestVersion: unique[0] ?? null };
+  }, [users]);
+
+  // Newest OTA bundle seen for each app version. OTA dates are only comparable
+  // within a version, since eas update publishes against the runtime version.
+  const newestOtaByVersion = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const u of users) {
+      for (const d of u.devices) {
+        if (!d.appVersion || !d.updateCreatedAt) continue;
+        const t = Date.parse(d.updateCreatedAt);
+        if (!Number.isFinite(t)) continue;
+        const cur = m.get(d.appVersion);
+        if (cur === undefined || t > cur) m.set(d.appVersion, t);
+      }
+    }
+    return m;
+  }, [users]);
+
+  // Two ways to be behind: an older binary, or the current binary running an OTA
+  // bundle older than the newest one seen for it (including no bundle at all).
+  const staleness = (d: Device): 'version' | 'update' | null => {
+    if (!d.appVersion) return null;
+    if (latestVersion && d.appVersion !== latestVersion) return 'version';
+    const newest = newestOtaByVersion.get(d.appVersion);
+    if (newest === undefined) return null;
+    if (!d.updateCreatedAt) return 'update';
+    return Date.parse(d.updateCreatedAt) < newest ? 'update' : null;
+  };
+
+  const visible = useMemo(() => {
+    if (!versionFilter) return users;
+    if (versionFilter === NEVER_OPENED) return users.filter(u => u.devices.length === 0);
+    if (versionFilter === BEHIND) {
+      return users.filter(u => u.devices.some(d => staleness(d) !== null));
+    }
+    return users.filter(u => u.devices.some(d => d.appVersion === versionFilter));
+  }, [users, versionFilter, latestVersion, newestOtaByVersion]);
   const [createEmail, setCreateEmail] = useState('');
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState('');
@@ -46,6 +130,7 @@ export default function UsersClient({ users: initial }: { users: User[] }) {
         memberId: null,
         memberName: null,
         isHoh: false,
+        devices: [],
       }]);
       setCreateEmail('');
       setCreateMsg(`Admin access granted for ${json.email}. They can now sign in with Google or a PIN.`);
@@ -55,7 +140,7 @@ export default function UsersClient({ users: initial }: { users: User[] }) {
     setCreating(false);
   };
 
-  const handleHohToggle = async (user: User) => {
+  const handleHohToggle = async (user: UserRow) => {
     if (!user.memberId) return;
     const newVal = !user.isHoh;
     setUsers(prev => prev.map(u => u.id === user.id ? { ...u, isHoh: newVal } : u));
@@ -66,7 +151,7 @@ export default function UsersClient({ users: initial }: { users: User[] }) {
     });
   };
 
-  const handleDelete = async (user: User) => {
+  const handleDelete = async (user: UserRow) => {
     if (!confirm(`Remove access for ${user.email}?`)) return;
     await fetch(`/api/users/${user.id}`, { method: 'DELETE' });
     setUsers(prev => prev.filter(u => u.id !== user.id));
@@ -105,9 +190,31 @@ export default function UsersClient({ users: initial }: { users: User[] }) {
         </form>
       </div>
 
+      {/* App version filter — answers "who is still on the old build?" */}
+      {(versions.length > 0 || users.some(u => u.devices.length === 0)) && (
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">App Version</label>
+          <select
+            value={versionFilter}
+            onChange={e => setVersionFilter(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 h-[34px] text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#7E282F]"
+          >
+            <option value="">All versions</option>
+            {versions.map(v => <option key={v} value={v}>{v}</option>)}
+            <option value={BEHIND}>Behind (old version or update)</option>
+            <option value={NEVER_OPENED}>Never opened</option>
+          </select>
+          {versionFilter && (
+            <span className="text-sm text-gray-500">
+              {visible.length} of {users.length}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* User list — mobile: cards */}
       <div className="md:hidden space-y-2">
-        {users.map(u => (
+        {visible.map(u => (
           <div key={u.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -116,7 +223,22 @@ export default function UsersClient({ users: initial }: { users: User[] }) {
                   ? <div className="text-gray-600 text-sm truncate">{u.memberName}</div>
                   : <div className="text-gray-400 text-xs italic">No matching member</div>}
                 <div className="text-gray-500 text-xs mt-1">
-                  Last sign-in: {u.lastSignIn ? new Date(u.lastSignIn).toLocaleDateString() : 'Never'}
+                  Last used: {u.devices.length > 0
+                    ? new Date(u.devices[0].lastSeenAt).toLocaleDateString()
+                    : '—'}
+                </div>
+                <div className="text-xs mt-1">
+                  {u.devices.length === 0 ? (
+                    <span className="text-gray-400 italic">Never opened the app</span>
+                  ) : (
+                    <span className="text-gray-500">
+                      App {u.devices[0].appVersion ?? '?'}
+                      {latestVersion && u.devices[0].appVersion && u.devices[0].appVersion !== latestVersion && (
+                        <span className="text-amber-600"> · outdated</span>
+                      )}
+                      {u.devices.length > 1 && <span className="text-gray-400"> · {u.devices.length} devices</span>}
+                    </span>
+                  )}
                 </div>
               </div>
               <button onClick={() => handleDelete(u)} className="text-red-400 hover:text-red-600 text-sm font-medium shrink-0">Remove</button>
@@ -153,12 +275,13 @@ export default function UsersClient({ users: initial }: { users: User[] }) {
               <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Linked Member</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">HOH</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Sign-in</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Used</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">App Version</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {users.map(u => (
+            {visible.map(u => (
               <React.Fragment key={u.id}>
                 <tr className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{u.email}</td>
@@ -185,12 +308,83 @@ export default function UsersClient({ users: initial }: { users: User[] }) {
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-500">
-                    {u.lastSignIn ? new Date(u.lastSignIn).toLocaleDateString() : 'Never'}
+                    {u.devices.length > 0
+                      ? new Date(u.devices[0].lastSeenAt).toLocaleDateString()
+                      : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => setExpanded(expanded === u.id ? null : u.id)}
+                      className="text-left group"
+                      title="Show sign-in and device detail"
+                    >
+                      {u.devices.length === 0 ? (
+                        <span className="text-gray-400 text-xs italic group-hover:underline">Never opened</span>
+                      ) : (
+                        <>
+                          <span className="text-gray-900 group-hover:underline">
+                            {u.devices[0].appVersion ?? '?'}
+                          </span>
+                          <span className="text-gray-400">
+                            {' · '}
+                            {u.devices[0].updateId
+                              ? `OTA ${otaLabel(u.devices[0].updateCreatedAt) ?? '—'}`
+                              : 'no OTA'}
+                          </span>
+                          {staleness(u.devices[0]) === 'version' && (
+                            <span className="ml-1.5 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-xs">outdated</span>
+                          )}
+                          {staleness(u.devices[0]) === 'update' && (
+                            <span className="ml-1.5 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-xs">old update</span>
+                          )}
+                          <span className="block text-gray-400 text-xs">
+                            {platformLabel(u.devices[0])}
+                            {u.devices.length > 1 && ` · ${u.devices.length} devices`}
+                          </span>
+                        </>
+                      )}
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => handleDelete(u)} className="text-red-400 hover:text-red-600 text-sm font-medium">Remove</button>
                   </td>
                 </tr>
+                {expanded === u.id && (
+                  <tr className="bg-gray-50">
+                    <td colSpan={7} className="px-4 py-3">
+                      <div className="text-xs text-gray-600 mb-2">
+                        Last signed in{' '}
+                        <span className="text-gray-900">
+                          {u.lastSignIn ? new Date(u.lastSignIn).toLocaleString() : 'never'}
+                        </span>
+                        <span className="text-gray-400"> — sessions persist, so this only moves when they re-authenticate</span>
+                      </div>
+                      {u.devices.length === 0 ? (
+                        <div className="text-xs text-gray-400 italic">No device has reported a version yet.</div>
+                      ) : (
+                      <table className="text-xs text-gray-600">
+                        <tbody>
+                          {u.devices.map(d => (
+                            <tr key={d.deviceId}>
+                              <td className="pr-6 py-1 text-gray-900">{d.appVersion ?? '?'}</td>
+                              <td className="pr-6 py-1">{platformLabel(d)}</td>
+                              <td className="pr-6 py-1" title={d.updateId ?? undefined}>
+                                {d.updateId
+                                  ? <>
+                                      OTA <span className="font-mono">{d.updateId.slice(0, 8)}</span>
+                                      {d.updateCreatedAt && ` · ${new Date(d.updateCreatedAt).toLocaleDateString()}`}
+                                    </>
+                                  : <span className="text-gray-400">no OTA</span>}
+                              </td>
+                              <td className="py-1">last used {new Date(d.lastSeenAt).toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      )}
+                    </td>
+                  </tr>
+                )}
               </React.Fragment>
             ))}
           </tbody>

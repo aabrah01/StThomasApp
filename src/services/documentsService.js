@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system/legacy';
 import { isDemoSession } from '../utils/config';
+import { logClientError } from './errorLogger';
 import { demoDocuments } from '../utils/demoData';
 
 // Lists and downloads PDFs from a link-shared Google Drive folder.
@@ -50,7 +51,8 @@ class DocumentsService {
       }));
 
       return { data: files, error: null };
-    } catch {
+    } catch (error) {
+      logClientError('documents.list', error);
       return { data: null, error: 'Failed to load documents. Please try again.' };
     }
   }
@@ -73,7 +75,8 @@ class DocumentsService {
 
       const { uri } = await FileSystem.downloadAsync(url, target);
       return { uri, error: null };
-    } catch {
+    } catch (error) {
+      logClientError('documents.download', error, { fileId });
       return { uri: null, error: 'Failed to download document. Please try again.' };
     }
   }

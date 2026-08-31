@@ -1,5 +1,6 @@
 import { supabase } from '../../supabase.config';
 import { isDemoSession } from '../utils/config';
+import { logClientError } from './errorLogger';
 
 // Supabase Storage bucket — create in Dashboard → Storage → New Bucket
 // Name: "family-photos"
@@ -29,12 +30,16 @@ class StorageService {
         .from(BUCKET)
         .upload(path, arrayBuffer, { upsert: true, contentType: 'image/jpeg' });
 
-      if (uploadError) return { url: null, error: uploadError.message };
+      if (uploadError) {
+        logClientError('storage.uploadFamilyPhoto', uploadError, { familyId });
+        return { url: null, error: uploadError.message };
+      }
 
       // Return the full public URL — works because the bucket is set to public
       const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
       return { url: data.publicUrl, error: null };
-    } catch {
+    } catch (error) {
+      logClientError('storage.uploadFamilyPhoto', error, { familyId });
       return { url: null, error: 'Upload failed. Please try again.' };
     }
   }
