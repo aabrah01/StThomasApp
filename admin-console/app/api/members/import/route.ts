@@ -97,6 +97,7 @@ export async function POST(request: Request) {
     updatedFamilies: 0,
     newMembers: 0,
     skipped: 0,
+    orphanedLinks: 0,
   };
 
   // Classify each family as new, changed, or unchanged
@@ -132,6 +133,10 @@ export async function POST(request: Request) {
 
   const normPhone = (p: string | null) => (p ?? '').replace(/\D/g, '');
   const normStr   = (s: string | null) => (s ?? '').trim().toLowerCase();
+
+  // Identity that survives delete+reinsert. Email can't be used here — an email
+  // change is exactly the case pledges have to be carried through.
+  const memberKey = (first: string | null, last: string | null) => `${normStr(first)}|${normStr(last)}`;
 
   const normDbMember   = (m: MemRow) =>
     [normStr(m.first_name), normStr(m.last_name), normStr(m.alias), normStr(m.email),
@@ -178,7 +183,13 @@ export async function POST(request: Request) {
 
   // --- Actual import ---
   const errors: string[] = [];
+  // Auth accounts whose member link could not be restored — the member's email
+  // changed, or they are gone from the CSV. The account survives with nothing
+  // pointing at it, so surface it for cleanup on Users & Roles.
+  const orphanedEmails: string[] = [];
   const skipSet = new Set(skipFamilyIds);
+
+  type SignupRow = { id: string; event_date: string; member_id: string; created_at: string };
 
   for (const [familyId, familyRows] of grouped) {
     if (skipSet.has(familyId)) continue;
@@ -189,6 +200,11 @@ export async function POST(request: Request) {
     // Keyed by lowercase email → user_id for members with an auth account link.
     // Restored after delete+reinsert using new member IDs.
     let preserved = new Map<string, string>();
+    // Pledges are keyed on member_id and cascade on delete, so they are snapshot
+    // and re-pointed at the recreated rows by name.
+    let mealSignups: SignupRow[] = [];
+    let flowerSignups: SignupRow[] = [];
+    const oldKeyByMemberId = new Map<string, string>();
 
     if (existingMap.has(familyId)) {
       // Update existing family
@@ -213,16 +229,27 @@ export async function POST(request: Request) {
       // members are deleted, so we re-insert them after using the new member IDs.
       const { data: existingMembers } = await supabase
         .from('members')
-        .select('email, member_users(user_id)')
+        .select('id, email, first_name, last_name, member_users(user_id)')
         .eq('family_id', dbFamilyId);
 
       for (const m of existingMembers ?? []) {
+        oldKeyByMemberId.set(m.id, memberKey(m.first_name, m.last_name));
         if (!m.email) continue;
         const linked = (m.member_users as { user_id: string }[] ?? []);
         const user_id = linked[0]?.user_id ?? null;
         if (user_id) {
           preserved.set(m.email.toLowerCase(), user_id);
         }
+      }
+
+      const oldMemberIds = (existingMembers ?? []).map(m => m.id);
+      if (oldMemberIds.length) {
+        const [{ data: meals }, { data: flowers }] = await Promise.all([
+          supabase.from('meal_signups').select('id, event_date, member_id, created_at').in('member_id', oldMemberIds),
+          supabase.from('flower_signups').select('id, event_date, member_id, created_at').in('member_id', oldMemberIds),
+        ]);
+        mealSignups = (meals ?? []) as SignupRow[];
+        flowerSignups = (flowers ?? []) as SignupRow[];
       }
 
       // Remove existing members before re-inserting
@@ -274,12 +301,13 @@ export async function POST(request: Request) {
 
       // Restore member_users links for members whose email matched a preserved
       // record. Fetch newly inserted IDs first since delete+reinsert assigns new UUIDs.
-      if (preserved.size > 0) {
+      if (preserved.size > 0 || mealSignups.length > 0 || flowerSignups.length > 0) {
         const { data: newMembers } = await supabase
           .from('members')
-          .select('id, email')
+          .select('id, email, first_name, last_name')
           .eq('family_id', dbFamilyId);
 
+        const restored = new Set<string>();
         for (const nm of newMembers ?? []) {
           const email = nm.email?.toLowerCase();
           if (!email) continue;
@@ -290,18 +318,52 @@ export async function POST(request: Request) {
             .from('member_users')
             .upsert({ user_id: userId, member_id: nm.id }, { onConflict: 'user_id,member_id' });
           if (linkErr) errors.push(`Restore user link for ${email}: ${linkErr.message}`);
+          else restored.add(email);
+        }
+
+        // A preserved link with no matching new member leaves its auth account
+        // stranded — report it rather than dropping it silently.
+        for (const email of preserved.keys()) {
+          if (!restored.has(email)) {
+            orphanedEmails.push(email);
+            errors.push(`${email} no longer matches a member — its login is now orphaned and should be removed on Users & Roles`);
+          }
+        }
+
+        const newIdByKey = new Map<string, string>();
+        for (const nm of newMembers ?? []) newIdByKey.set(memberKey(nm.first_name, nm.last_name), nm.id);
+
+        const remap = (rows: SignupRow[]) =>
+          rows.flatMap(r => {
+            const key = oldKeyByMemberId.get(r.member_id);
+            const newId = key ? newIdByKey.get(key) : undefined;
+            return newId ? [{ ...r, member_id: newId }] : [];
+          });
+
+        for (const [table, snapshot] of [['meal_signups', mealSignups], ['flower_signups', flowerSignups]] as const) {
+          if (snapshot.length === 0) continue;
+          const rows = remap(snapshot);
+          if (rows.length) {
+            const { error: signupErr } = await supabase.from(table).insert(rows);
+            if (signupErr) errors.push(`Restore ${table} for family ${familyId}: ${signupErr.message}`);
+          }
+          if (rows.length < snapshot.length) {
+            errors.push(`${snapshot.length - rows.length} ${table.replace('_', ' ')} for family ${familyId} could not be re-linked (member renamed or removed)`);
+          }
         }
       }
     }
   }
+
+  summary.orphanedLinks = orphanedEmails.length;
 
   await supabase.from('audit_log').insert({
     user_id: auth.userId,
     action: 'import',
     table_name: 'members',
     record_id: null,
-    details: { ...summary, errors: errors.slice(0, 20) },
+    details: { ...summary, errors: errors.slice(0, 20), orphaned: orphanedEmails.slice(0, 20) },
   });
 
-  return NextResponse.json({ summary, errors });
+  return NextResponse.json({ summary, errors, orphaned: orphanedEmails });
 }

@@ -1,5 +1,5 @@
 import { createAdminSupabase } from '@/lib/supabase';
-import { DEMO_USERS, DEMO_DEVICES } from '@/lib/demoData';
+import { DEMO_USERS, DEMO_DEVICES, DEMO_MEMBERS } from '@/lib/demoData';
 import UsersClient, { type UserRow } from './UsersClient';
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
@@ -10,10 +10,17 @@ export default async function UsersPage() {
   let rows: UserRow[];
 
   if (DEMO_MODE) {
-    rows = DEMO_USERS.map(u => ({
-      ...u, memberId: null, memberName: null, isHoh: false,
-      devices: DEMO_DEVICES[u.id] ?? [],
-    }));
+    // Matched by email as in production, so demo members aren't shown as orphans
+    rows = DEMO_USERS.map(u => {
+      const member = DEMO_MEMBERS.find(m => !!m.email && m.email.toLowerCase() === u.email.toLowerCase());
+      return {
+        ...u,
+        memberId: member?.id ?? null,
+        memberName: member ? `${member.firstName} ${member.lastName}` : null,
+        isHoh: member?.isHeadOfHousehold ?? false,
+        devices: DEMO_DEVICES[u.id] ?? [],
+      };
+    });
   } else {
     const supabase = createAdminSupabase();
     const [{ data: { users } }, { data: roles }, { data: members }, { data: installs }] = await Promise.all([

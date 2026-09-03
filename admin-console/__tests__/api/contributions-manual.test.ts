@@ -163,7 +163,9 @@ describe('PATCH /api/families/[id]', () => {
       }
       if (table === 'members') {
         return {
-          delete: () => ({ eq: () => Promise.resolve({ error: null }) }),
+          select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }),
+          delete: () => ({ in: () => Promise.resolve({ error: null }) }),
+          upsert: () => Promise.resolve({ error: null }),
           insert: () => Promise.resolve({ error: null }),
         };
       }
@@ -181,19 +183,31 @@ describe('PATCH /api/families/[id]', () => {
     expect(json.success).toBe(true);
   });
 
-  it('replaces members when members array is provided', async () => {
-    const membersInsert = jest.fn().mockResolvedValue({ error: null });
-    const membersDelete = jest.fn().mockReturnValue({ eq: jest.fn().mockResolvedValue({ error: null }) });
+  // Members are diffed rather than wiped: deleting a member cascades to
+  // member_users, meal_signups and flower_signups.
+  const mockMembers = (existing: { id: string }[]) => {
+    const insert = jest.fn().mockResolvedValue({ error: null });
+    const upsert = jest.fn().mockResolvedValue({ error: null });
+    const deleteIn = jest.fn().mockResolvedValue({ error: null });
+    const del = jest.fn().mockReturnValue({ in: deleteIn });
 
     mockFrom.mockImplementation((table: string) => {
       if (table === 'families') {
         return { update: () => ({ eq: () => Promise.resolve({ error: null }) }) };
       }
       if (table === 'members') {
-        return { delete: membersDelete, insert: membersInsert };
+        return {
+          select: () => ({ eq: () => Promise.resolve({ data: existing, error: null }) }),
+          delete: del, upsert, insert,
+        };
       }
       return { insert: () => Promise.resolve({ error: null }) };
     });
+    return { insert, upsert, del, deleteIn };
+  };
+
+  it('inserts members that have no id', async () => {
+    const { insert, upsert, del } = mockMembers([]);
 
     const res = await familyPatch(makePatchRequest({
       familyName: 'Smith Family',
@@ -203,9 +217,58 @@ describe('PATCH /api/families/[id]', () => {
         { firstName: 'Jane', lastName: 'Smith', isHeadOfHousehold: false },
       ],
     }), familyParams);
+
     expect(res.status).toBe(200);
-    expect(membersDelete).toHaveBeenCalled();
-    expect(membersInsert).toHaveBeenCalled();
+    expect(insert).toHaveBeenCalledWith([
+      expect.objectContaining({ first_name: 'John', is_head_of_household: true }),
+      expect.objectContaining({ first_name: 'Jane', is_head_of_household: false }),
+    ]);
+    expect(upsert).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it('updates existing members in place and deletes only the ones dropped', async () => {
+    const { insert, upsert, deleteIn } = mockMembers([{ id: 'mem-keep' }, { id: 'mem-drop' }]);
+
+    const res = await familyPatch(makePatchRequest({
+      familyName: 'Smith Family',
+      membershipId: 'MEM001',
+      members: [
+        { id: 'mem-keep', firstName: 'John', lastName: 'Smith', isHeadOfHousehold: true },
+        { firstName: 'Baby', lastName: 'Smith', isHeadOfHousehold: false },
+      ],
+    }), familyParams);
+
+    expect(res.status).toBe(200);
+    expect(upsert).toHaveBeenCalledWith(
+      [expect.objectContaining({ id: 'mem-keep', first_name: 'John' })],
+      { onConflict: 'id' },
+    );
+    expect(insert).toHaveBeenCalledWith([expect.objectContaining({ first_name: 'Baby' })]);
+    expect(deleteIn).toHaveBeenCalledWith('id', ['mem-drop']);
+  });
+
+  it('ignores a member id that does not belong to this family', async () => {
+    const { insert, upsert } = mockMembers([{ id: 'mem-keep' }]);
+
+    const res = await familyPatch(makePatchRequest({
+      familyName: 'Smith Family',
+      membershipId: 'MEM001',
+      members: [
+        { id: 'mem-keep', firstName: 'John', lastName: 'Smith', isHeadOfHousehold: true },
+        { id: 'someone-elses-member', firstName: 'Mallory', lastName: 'Smith', isHeadOfHousehold: false },
+      ],
+    }), familyParams);
+
+    expect(res.status).toBe(200);
+    expect(upsert).toHaveBeenCalledWith(
+      [expect.objectContaining({ id: 'mem-keep' })],
+      { onConflict: 'id' },
+    );
+    // Inserted as a new member of this family, never adopted by id
+    expect(insert).toHaveBeenCalledWith([
+      expect.not.objectContaining({ id: 'someone-elses-member' }),
+    ]);
   });
 
   it('returns 400 when familyName is missing', async () => {

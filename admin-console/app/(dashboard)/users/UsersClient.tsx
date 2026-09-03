@@ -43,6 +43,10 @@ const compareVersions = (a: string, b: string) => {
   return 0;
 };
 
+// An account matching no member can't sign in — the member's email changed or
+// they left the roll. Admins legitimately have no member record.
+const isOrphan = (u: UserRow) => !u.memberId && u.role !== 'admin';
+
 const platformLabel = (d: Device) =>
   [d.platform === 'ios' ? 'iOS' : d.platform === 'android' ? 'Android' : d.platform, d.osVersion]
     .filter(Boolean)
@@ -52,6 +56,9 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
   const [users, setUsers] = useState(initial);
   const [versionFilter, setVersionFilter] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [showOrphansOnly, setShowOrphansOnly] = useState(false);
+
+  const orphans = useMemo(() => users.filter(isOrphan), [users]);
 
   // "Stale" is measured against the highest version anyone has reported, so no
   // release number has to be hardcoded here.
@@ -91,13 +98,14 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
   };
 
   const visible = useMemo(() => {
-    if (!versionFilter) return users;
-    if (versionFilter === NEVER_OPENED) return users.filter(u => u.devices.length === 0);
+    const base = showOrphansOnly ? users.filter(isOrphan) : users;
+    if (!versionFilter) return base;
+    if (versionFilter === NEVER_OPENED) return base.filter(u => u.devices.length === 0);
     if (versionFilter === BEHIND) {
-      return users.filter(u => u.devices.some(d => staleness(d) !== null));
+      return base.filter(u => u.devices.some(d => staleness(d) !== null));
     }
-    return users.filter(u => u.devices.some(d => d.appVersion === versionFilter));
-  }, [users, versionFilter, latestVersion, newestOtaByVersion]);
+    return base.filter(u => u.devices.some(d => d.appVersion === versionFilter));
+  }, [users, versionFilter, showOrphansOnly, latestVersion, newestOtaByVersion]);
   const [createEmail, setCreateEmail] = useState('');
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState('');
@@ -190,6 +198,22 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
         </form>
       </div>
 
+      {/* Accounts left behind when a member's email changed or they left the roll */}
+      {orphans.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
+          <p className="text-sm text-red-800">
+            <strong>{orphans.length}</strong> {orphans.length === 1 ? 'account matches' : 'accounts match'} no church member.
+            They cannot sign in and should be removed.
+          </p>
+          <button
+            onClick={() => setShowOrphansOnly(v => !v)}
+            className="text-sm font-medium text-red-800 underline whitespace-nowrap shrink-0"
+          >
+            {showOrphansOnly ? 'Show all users' : 'Show only these'}
+          </button>
+        </div>
+      )}
+
       {/* App version filter — answers "who is still on the old build?" */}
       {(versions.length > 0 || users.some(u => u.devices.length === 0)) && (
         <div className="flex items-center gap-3">
@@ -221,7 +245,9 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
                 <div className="font-medium text-gray-900 truncate">{u.email}</div>
                 {u.memberName
                   ? <div className="text-gray-600 text-sm truncate">{u.memberName}</div>
-                  : <div className="text-gray-400 text-xs italic">No matching member</div>}
+                  : isOrphan(u)
+                    ? <div className="mt-0.5"><span className="inline-block px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-semibold uppercase tracking-wide">Orphaned</span></div>
+                    : <div className="text-gray-400 text-xs italic">No matching member</div>}
                 <div className="text-gray-500 text-xs mt-1">
                   Last used: {u.devices.length > 0
                     ? new Date(u.devices[0].lastSeenAt).toLocaleDateString()
@@ -288,7 +314,9 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
                   <td className="px-4 py-3">
                     {u.memberName
                       ? <span className="text-gray-900">{u.memberName}</span>
-                      : <span className="text-gray-400 text-xs italic">No match</span>}
+                      : isOrphan(u)
+                        ? <span className="inline-block px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-semibold uppercase tracking-wide">Orphaned</span>
+                        : <span className="text-gray-400 text-xs italic">No match</span>}
                   </td>
                   <td className="px-4 py-3">
                     <select value={u.role} onChange={e => handleRoleChange(u.id, e.target.value)}
