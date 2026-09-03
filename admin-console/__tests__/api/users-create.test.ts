@@ -38,105 +38,79 @@ const makeCreateRequest = (body: unknown) =>
     headers: { 'Content-Type': 'application/json' },
   });
 
+// The route takes an email and nothing else: the account is always an admin,
+// sign-in is by PIN or Google (so there is no password), and the address does
+// not have to belong to a member — staff addresses are expected.
 describe('POST /api/users/create', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockAdminCreateUser.mockResolvedValue({
-      data: { user: { id: 'new-user-id', email: 'member@example.com' } },
-      error: null,
-    });
+  let memberUsersUpsert: jest.Mock;
+
+  // `members` holds the rows sharing the new user's email; the route links each.
+  const mockTables = (members: { id: string }[]) => {
+    memberUsersUpsert = jest.fn().mockResolvedValue({ error: null });
     mockFrom.mockImplementation((table: string) => {
       if (table === 'members') {
-        return {
-          select: jest.fn().mockReturnValue({
-            eq: jest.fn().mockReturnValue(
-              Promise.resolve({ count: 1, error: null })
-            ),
-          }),
-        };
+        return { select: () => ({ eq: () => Promise.resolve({ data: members, error: null }) }) };
+      }
+      if (table === 'member_users') {
+        return { upsert: memberUsersUpsert };
       }
       return {
         upsert: () => Promise.resolve({ error: null }),
         insert: () => Promise.resolve({ error: null }),
       };
     });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockAdminCreateUser.mockResolvedValue({
+      data: { user: { id: 'new-user-id', email: 'member@example.com' } },
+      error: null,
+    });
+    mockTables([{ id: 'member-1' }]);
     const { checkRateLimit } = require('@/lib/rateLimit');
     checkRateLimit.mockReturnValue(true);
   });
 
-  it('creates a user for a registered member email', async () => {
-    const res = await createPost(makeCreateRequest({
-      email: 'member@example.com',
-      password: 'securepass123',
-      role: 'member',
-    }));
+  it('creates an admin account for a valid email', async () => {
+    const res = await createPost(makeCreateRequest({ email: 'member@example.com' }));
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.id).toBe('new-user-id');
-    expect(json.email).toBe('member@example.com');
+    expect(json).toEqual({ id: 'new-user-id', email: 'member@example.com', role: 'admin' });
   });
 
-  it('returns 400 when email is not in the members table', async () => {
-    mockFrom.mockImplementation((table: string) => {
-      if (table === 'members') {
-        return {
-          select: jest.fn().mockReturnValue({
-            eq: jest.fn().mockReturnValue(
-              Promise.resolve({ count: 0, error: null })
-            ),
-          }),
-        };
-      }
-      return { insert: () => Promise.resolve({ error: null }) };
+  it('creates the account without a password', async () => {
+    await createPost(makeCreateRequest({ email: 'member@example.com' }));
+    expect(mockAdminCreateUser).toHaveBeenCalledWith({
+      email: 'member@example.com',
+      email_confirm: true,
     });
+  });
 
-    const res = await createPost(makeCreateRequest({
-      email: 'outsider@example.com',
-      password: 'securepass123',
-      role: 'member',
-    }));
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json.error).toMatch(/registered member/i);
+  it('links the new user to every member sharing the email', async () => {
+    mockTables([{ id: 'member-1' }, { id: 'member-2' }]);
+
+    const res = await createPost(makeCreateRequest({ email: 'member@example.com' }));
+    expect(res.status).toBe(200);
+    expect(memberUsersUpsert).toHaveBeenCalledWith(
+      [
+        { user_id: 'new-user-id', member_id: 'member-1' },
+        { user_id: 'new-user-id', member_id: 'member-2' },
+      ],
+      { onConflict: 'user_id,member_id' },
+    );
+  });
+
+  it('still creates the account when the email matches no member', async () => {
+    mockTables([]);
+
+    const res = await createPost(makeCreateRequest({ email: 'staff@example.com' }));
+    expect(res.status).toBe(200);
+    expect(memberUsersUpsert).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid email format', async () => {
-    const res = await createPost(makeCreateRequest({
-      email: 'not-an-email',
-      password: 'securepass123',
-      role: 'member',
-    }));
-    expect(res.status).toBe(400);
-  });
-
-  it('returns 400 when password is too short (< 8 chars)', async () => {
-    const res = await createPost(makeCreateRequest({
-      email: 'member@example.com',
-      password: 'short',
-      role: 'member',
-    }));
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json.error).toMatch(/8 characters/i);
-  });
-
-  it('returns 400 when password exceeds 72 characters', async () => {
-    const res = await createPost(makeCreateRequest({
-      email: 'member@example.com',
-      password: 'a'.repeat(73),
-      role: 'member',
-    }));
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json.error).toMatch(/72 characters/i);
-  });
-
-  it('returns 400 for invalid role', async () => {
-    const res = await createPost(makeCreateRequest({
-      email: 'member@example.com',
-      password: 'securepass123',
-      role: 'superuser',
-    }));
+    const res = await createPost(makeCreateRequest({ email: 'not-an-email' }));
     expect(res.status).toBe(400);
   });
 
@@ -146,11 +120,7 @@ describe('POST /api/users/create', () => {
       error: { message: 'Email already registered' },
     });
 
-    const res = await createPost(makeCreateRequest({
-      email: 'member@example.com',
-      password: 'securepass123',
-      role: 'member',
-    }));
+    const res = await createPost(makeCreateRequest({ email: 'member@example.com' }));
     expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.error).toMatch(/already exists/i);
@@ -160,11 +130,7 @@ describe('POST /api/users/create', () => {
     const { checkRateLimit } = require('@/lib/rateLimit');
     checkRateLimit.mockReturnValue(false);
 
-    const res = await createPost(makeCreateRequest({
-      email: 'member@example.com',
-      password: 'securepass123',
-      role: 'member',
-    }));
+    const res = await createPost(makeCreateRequest({ email: 'member@example.com' }));
     expect(res.status).toBe(429);
   });
 
@@ -172,23 +138,8 @@ describe('POST /api/users/create', () => {
     const { requireAdmin } = require('@/lib/requireAdmin');
     requireAdmin.mockResolvedValueOnce(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
 
-    const res = await createPost(makeCreateRequest({
-      email: 'member@example.com',
-      password: 'securepass123',
-      role: 'member',
-    }));
+    const res = await createPost(makeCreateRequest({ email: 'member@example.com' }));
     expect(res.status).toBe(401);
-  });
-
-  it('succeeds with member role when role is omitted', async () => {
-    // validateRole treats missing/falsy role as valid (defaults to 'member')
-    const res = await createPost(makeCreateRequest({
-      email: 'member@example.com',
-      password: 'securepass123',
-    }));
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.role).toBe('member');
   });
 });
 
