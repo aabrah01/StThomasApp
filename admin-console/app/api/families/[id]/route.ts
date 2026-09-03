@@ -42,22 +42,47 @@ export async function PATCH(request: Request, { params }: Params) {
 
   if (familyErr) return NextResponse.json({ error: 'Failed to update family' }, { status: 400 });
 
-  await supabase.from('members').delete().eq('family_id', id);
+  // Update members in place rather than delete-and-reinsert. Deleting a member
+  // cascades to member_users, meal_signups and flower_signups, so wiping the
+  // family on every save silently unlinked app accounts and dropped pledges.
+  const { data: existingRows } = await supabase.from('members').select('id').eq('family_id', id);
+  const existingIds = new Set((existingRows ?? []).map(r => r.id));
 
-  if (members?.length) {
-    const { error: membersErr } = await supabase.from('members').insert(
-      members.map((m: Record<string, unknown>) => ({
-        // Never accept a client-supplied id — always let the DB generate it
-        family_id: id,
-        first_name: String(m.firstName ?? '').slice(0, 50),
-        last_name: String(m.lastName ?? '').slice(0, 50),
-        role: m.role ? String(m.role).slice(0, 50) : null,
-        email: m.email ? String(m.email).trim().toLowerCase().slice(0, 255) : null,
-        phone_number: m.phoneNumber ? String(m.phoneNumber).slice(0, 30) : null,
-        is_head_of_household: m.isHeadOfHousehold === true,
-      }))
-    );
-    if (membersErr) return NextResponse.json({ error: 'Failed to update members' }, { status: 400 });
+  const memberFields = (m: Record<string, unknown>) => ({
+    first_name: String(m.firstName ?? '').slice(0, 50),
+    last_name: String(m.lastName ?? '').slice(0, 50),
+    role: m.role ? String(m.role).slice(0, 50) : null,
+    email: m.email ? String(m.email).trim().toLowerCase().slice(0, 255) : null,
+    phone_number: m.phoneNumber ? String(m.phoneNumber).slice(0, 30) : null,
+    is_head_of_household: m.isHeadOfHousehold === true,
+  });
+
+  // Only an id that already belongs to this family is honoured, so a
+  // client-supplied id can never pull another family's member in here.
+  const keptIds = new Set<string>();
+  const toUpdate: Record<string, unknown>[] = [];
+  const toInsert: Record<string, unknown>[] = [];
+  for (const m of (members ?? []) as Record<string, unknown>[]) {
+    const memberId = typeof m.id === 'string' && existingIds.has(m.id) ? m.id : null;
+    if (memberId) {
+      keptIds.add(memberId);
+      toUpdate.push({ id: memberId, family_id: id, ...memberFields(m) });
+    } else {
+      toInsert.push({ family_id: id, ...memberFields(m) });
+    }
+  }
+
+  const removedIds = [...existingIds].filter(mid => !keptIds.has(mid));
+  if (removedIds.length) {
+    await supabase.from('members').delete().in('id', removedIds);
+  }
+  if (toUpdate.length) {
+    const { error: updateErr } = await supabase.from('members').upsert(toUpdate, { onConflict: 'id' });
+    if (updateErr) return NextResponse.json({ error: 'Failed to update members' }, { status: 400 });
+  }
+  if (toInsert.length) {
+    const { error: insertErr } = await supabase.from('members').insert(toInsert);
+    if (insertErr) return NextResponse.json({ error: 'Failed to update members' }, { status: 400 });
   }
 
   await supabase.from('audit_log').insert({
