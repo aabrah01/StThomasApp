@@ -109,14 +109,27 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
   const [createEmail, setCreateEmail] = useState('');
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState('');
+  const [actionMsg, setActionMsg] = useState('');
 
+  // Each mutation below updates local state only once the server confirms it,
+  // so a rejected change never sits on screen looking as though it applied.
   const handleRoleChange = async (userId: string, newRole: string) => {
-    await fetch('/api/users/role', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, role: newRole }),
-    });
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    setActionMsg('');
+    try {
+      const res = await fetch('/api/users/role', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, role: newRole }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setActionMsg(json.error ?? 'Could not change that role.');
+        return;
+      }
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    } catch {
+      setActionMsg('Could not change that role — check your connection and try again.');
+    }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -151,18 +164,40 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
   const handleHohToggle = async (user: UserRow) => {
     if (!user.memberId) return;
     const newVal = !user.isHoh;
-    setUsers(prev => prev.map(u => u.id === user.id ? { ...u, isHoh: newVal } : u));
-    await fetch('/api/users/hoh', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ memberId: user.memberId, isHoh: newVal }),
-    });
+    setActionMsg('');
+    try {
+      const res = await fetch('/api/users/hoh', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: user.memberId, isHoh: newVal }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setActionMsg(json.error ?? `Could not update head of household for ${user.email}.`);
+        return;
+      }
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, isHoh: newVal } : u));
+    } catch {
+      setActionMsg(`Could not update head of household for ${user.email} — check your connection and try again.`);
+    }
   };
 
   const handleDelete = async (user: UserRow) => {
     if (!confirm(`Remove access for ${user.email}?`)) return;
-    await fetch(`/api/users/${user.id}`, { method: 'DELETE' });
-    setUsers(prev => prev.filter(u => u.id !== user.id));
+    setActionMsg('');
+    // Drop the row only once the server confirms it — otherwise a rejected
+    // delete (your own account, a network failure) still looks like it worked.
+    try {
+      const res = await fetch(`/api/users/${user.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setActionMsg(json.error ?? `Could not remove ${user.email}.`);
+        return;
+      }
+      setUsers(prev => prev.filter(u => u.id !== user.id));
+    } catch {
+      setActionMsg(`Could not remove ${user.email} — check your connection and try again.`);
+    }
   };
 
   return (
@@ -234,6 +269,10 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
             </span>
           )}
         </div>
+      )}
+
+      {actionMsg && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">{actionMsg}</div>
       )}
 
       {/* User list — mobile: cards */}
