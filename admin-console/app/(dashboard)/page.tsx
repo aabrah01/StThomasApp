@@ -1,5 +1,5 @@
 import { createAdminSupabase } from '@/lib/supabase';
-import { DEMO_FAMILIES, DEMO_MEMBERS, DEMO_CONTRIBUTIONS } from '@/lib/demoData';
+import { DEMO_FAMILIES, DEMO_MEMBERS, DEMO_CONTRIBUTIONS, DEMO_USERS } from '@/lib/demoData';
 import FeaturesSection from './FeaturesSection';
 import ContactsSection, { type ChurchContact } from './ContactsSection';
 
@@ -23,21 +23,23 @@ export default async function DashboardPage() {
     familyCount = DEMO_FAMILIES.length;
     memberCount = DEMO_MEMBERS.length;
     contribCount = DEMO_CONTRIBUTIONS.length;
-    appUserCount = 3;
+    appUserCount = DEMO_USERS.length;
   } else {
     const supabase = createAdminSupabase();
     const [fc, mc, cc, uc, settings, contactRows] = await Promise.all([
       supabase.from('families').select('*', { count: 'exact', head: true }),
       supabase.from('members').select('*', { count: 'exact', head: true }),
       supabase.from('contributions').select('*', { count: 'exact', head: true }),
-      supabase.from('member_users').select('*', { count: 'exact', head: true }),
+      // Rows, not people: a member_users row per member, so anyone linked to two
+      // members sharing an email would be counted twice. Dedupe on user_id.
+      supabase.from('member_users').select('user_id'),
       supabase.from('app_settings').select('enable_meal_signup, enable_flower_signup, enable_documents, assembly_docs_folder_id').eq('id', 'config').single(),
       supabase.from('church_contacts').select('role, name, phone, email').order('display_order'),
     ]);
     familyCount = fc.count ?? 0;
     memberCount = mc.count ?? 0;
     contribCount = cc.count ?? 0;
-    appUserCount = uc.count ?? 0;
+    appUserCount = new Set((uc.data ?? []).map(r => r.user_id)).size;
     enableMealSignup = settings.data?.enable_meal_signup ?? false;
     enableFlowerSignup = settings.data?.enable_flower_signup ?? false;
     enableDocuments = settings.data?.enable_documents ?? false;
