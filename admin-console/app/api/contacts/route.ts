@@ -13,6 +13,8 @@ const DEMO_CONTACTS = ROLES.map((role, i) => ({
   name: '',
   phone: '',
   email: '',
+  notifyMeal: false,
+  notifyFlower: false,
   displayOrder: i + 1,
 }));
 
@@ -32,7 +34,7 @@ export async function GET() {
   const supabase = createAdminSupabase();
   const { data } = await supabase
     .from('church_contacts')
-    .select('role, name, phone, email, display_order')
+    .select('role, name, phone, email, notify_meal, notify_flower, display_order')
     .order('display_order');
 
   const byRole = new Map((data ?? []).map(r => [r.role, r]));
@@ -45,6 +47,8 @@ export async function GET() {
         name: row?.name ?? '',
         phone: row?.phone ?? '',
         email: row?.email ?? '',
+        notifyMeal: row?.notify_meal ?? false,
+        notifyFlower: row?.notify_flower ?? false,
         displayOrder: row?.display_order ?? i + 1,
       };
     }),
@@ -56,7 +60,7 @@ export async function PATCH(request: Request) {
   if (isError(auth)) return auth;
 
   const body = await request.json();
-  const { role, name, phone, email } = body;
+  const { role, name, phone, email, notifyMeal, notifyFlower } = body;
 
   if (!ROLES.includes(role as Role)) {
     return NextResponse.json({ error: 'Unknown contact role' }, { status: 400 });
@@ -64,6 +68,11 @@ export async function PATCH(request: Request) {
   for (const [key, value] of Object.entries({ name, phone, email })) {
     if (value !== undefined && typeof value !== 'string') {
       return NextResponse.json({ error: `${key} must be a string` }, { status: 400 });
+    }
+  }
+  for (const [key, value] of Object.entries({ notifyMeal, notifyFlower })) {
+    if (value !== undefined && typeof value !== 'boolean') {
+      return NextResponse.json({ error: `${key} must be a boolean` }, { status: 400 });
     }
   }
 
@@ -74,6 +83,10 @@ export async function PATCH(request: Request) {
     name: clean(name),
     phone: clean(phone),
     email: clean(email),
+    // The column is NOT NULL, so an omitted flag has to land as false rather
+    // than null — the upsert writes the whole row either way.
+    notify_meal: notifyMeal === true,
+    notify_flower: notifyFlower === true,
     updated_at: new Date().toISOString(),
   };
 

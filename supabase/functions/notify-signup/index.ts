@@ -1,8 +1,12 @@
 /**
  * Supabase Edge Function — notify-signup
  *
- * Emails the parish secretary and treasurer when a member pledges food or
- * flowers for a service, or cancels a pledge.
+ * Emails the church contacts who are marked for this kind of sign-up when a
+ * member pledges food or flowers for a service, or cancels a pledge.
+ *
+ * Recipients come from church_contacts.notify_meal / notify_flower, ticked per
+ * contact on the admin dashboard. Both start on for the secretary and treasurer,
+ * which is who this mailed before the flags existed.
  *
  * Each email carries the full current roster for that kind on that service, so
  * the latest one always stands alone — no reading back through a chain of them
@@ -77,8 +81,8 @@ const json = (body: unknown, status = 200) =>
   });
 
 const KINDS = {
-  meal:   { table: 'meal_signups',   thing: 'Food',    pledge: 'bring food' },
-  flower: { table: 'flower_signups', thing: 'Flowers', pledge: 'donate flowers' },
+  meal:   { table: 'meal_signups',   thing: 'Food',    pledge: 'bring food',     notifyColumn: 'notify_meal' },
+  flower: { table: 'flower_signups', thing: 'Flowers', pledge: 'donate flowers', notifyColumn: 'notify_flower' },
 } as const;
 
 type Kind = keyof typeof KINDS;
@@ -173,7 +177,7 @@ Deno.serve(async (req: Request) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) return json({ error: 'invalid_body' }, 400);
     if (!eventId || eventId.length > 1024) return json({ error: 'invalid_body' }, 400);
 
-    const { table, thing, pledge } = KINDS[kind as Kind];
+    const { table, thing, pledge, notifyColumn } = KINDS[kind as Kind];
 
     // ── Check the member belongs to the caller, and get their name ────────────
     const { data: link, error: linkError } = await adminClient
@@ -204,7 +208,7 @@ Deno.serve(async (req: Request) => {
     // current list together from a chain of them. It doubles as the state check.
     const { data: rows, error: rowsError } = await adminClient
       .from(table)
-      .select('member_id, member:members(first_name, last_name, family:families(membership_id))')
+      .select('member_id, pledge_type, member:members(first_name, last_name, family:families(membership_id))')
       .eq('event_id', eventId)
       .order('created_at', { ascending: true });
 
@@ -218,6 +222,14 @@ Deno.serve(async (req: Request) => {
     const exists = (rows ?? []).some(r => r.member_id === memberId);
     if ((action === 'created') !== exists) return json({ error: 'state_mismatch' }, 409);
 
+    // 'full' — covering the service alone, which closes it to other sign-ups.
+    // 'shared' — splitting it with whoever else pledges. Rows made before the
+    // app asked the question have neither, and are listed without a note.
+    const pledgeNote = (type: string | null) =>
+      type === 'full' ? ' — donating for the whole service'
+      : type === 'shared' ? ' — sharing with others'
+      : '';
+
     const roster = (rows ?? []).map((row) => {
       const m = row.member as unknown as {
         first_name: string;
@@ -225,14 +237,17 @@ Deno.serve(async (req: Request) => {
         family: { membership_id: string | null } | null;
       } | null;
       const name = [m?.first_name, m?.last_name].filter(Boolean).join(' ') || 'Unknown member';
-      return m?.family?.membership_id ? `${name} [${m.family.membership_id}]` : name;
+      const label = m?.family?.membership_id ? `${name} [${m.family.membership_id}]` : name;
+      return `${label}${pledgeNote(row.pledge_type ?? null)}`;
     });
 
     // ── Recipients ────────────────────────────────────────────────────────────
+    // Whoever an admin has ticked for this kind on the dashboard — the two
+    // flags are independent, so the food and flower lists need not match.
     const { data: contacts, error: contactsError } = await adminClient
       .from('church_contacts')
       .select('role, email')
-      .in('role', ['secretary', 'treasurer']);
+      .eq(notifyColumn, true);
 
     if (contactsError) {
       console.error('contacts lookup error:', contactsError.message);
@@ -246,7 +261,7 @@ Deno.serve(async (req: Request) => {
     if (!recipients.length) {
       // Said out loud rather than returning silently: someone who set a Resend
       // key and saw no mail needs to tell "not attempted" from "send failed".
-      console.log('[signup notify] no secretary/treasurer email set in church_contacts — nothing sent.');
+      console.log(`[signup notify] no church_contacts row has ${notifyColumn} ticked with an email set — nothing sent.`);
       return json({ sent: 0, reason: 'no_recipients' });
     }
 
@@ -260,8 +275,13 @@ Deno.serve(async (req: Request) => {
       ? `${prefix}${thing} sign-up — ${memberName}, ${when}`
       : `${prefix}${thing} sign-up CANCELLED — ${memberName}, ${when}`;
 
+    // Read off the row rather than taken from the request: nothing the caller
+    // sends reaches the email. A cancellation has no row left to read, so it
+    // says only that the pledge is gone.
+    const ownType = (rows ?? []).find(r => r.member_id === memberId)?.pledge_type ?? null;
+
     const headline = action === 'created'
-      ? `${who} has pledged to ${pledge}.`
+      ? `${who} has pledged to ${pledge}${pledgeNote(ownType)}.`
       : `${who} has cancelled their pledge to ${pledge}.`;
 
     const detail = eventLabel ? `${when} — ${eventLabel}` : when;

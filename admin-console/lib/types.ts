@@ -35,12 +35,18 @@ export interface Contribution {
   fiscalYear: number;
 }
 
+// 'full' — the member is covering the service alone, which closes it to other
+// sign-ups. 'shared' — they are splitting it. null on pledges made before the
+// app asked.
+export type PledgeType = 'full' | 'shared' | null;
+
 export interface MealSignup {
   id: string;
   eventDate: string;
   memberId: string;
   memberName: string;
   familyName: string;
+  pledgeType: PledgeType;
   createdAt: string;
 }
 
@@ -50,6 +56,7 @@ export interface FlowerSignup {
   memberId: string;
   memberName: string;
   familyName: string;
+  pledgeType: PledgeType;
   createdAt: string;
 }
 

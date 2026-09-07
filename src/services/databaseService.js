@@ -55,6 +55,18 @@ const notifySignup = async (kind, action, memberId, eventDate, eventId) => {
   }
 };
 
+/**
+ * Both unique indexes on the sign-up tables surface as 23505, and neither raw
+ * message is any use to a member. The full-pledge one is genuinely reachable:
+ * two people can open the same service and both choose to cover it.
+ */
+const signupErrorMessage = (error) => {
+  if (error.code !== '23505') return error.message;
+  return error.message.includes('full_pledge')
+    ? 'Someone else has already pledged to donate for this service.'
+    : 'You have already pledged for this service.';
+};
+
 // ── Row mappers ───────────────────────────────────────────────────────────────
 
 const mapFamily = (row) => ({
@@ -398,6 +410,7 @@ class DatabaseService {
           return {
             id: s.id,
             memberId: s.memberId,
+            pledgeType: s.pledgeType,
             createdAt: s.createdAt,
             member: m ? { firstName: m.firstName, lastName: m.lastName, familyId: m.familyId } : null,
           };
@@ -406,13 +419,14 @@ class DatabaseService {
     }
     const { data, error } = await supabase
       .from('meal_signups')
-      .select('id, member_id, created_at, member:members(first_name, last_name, family_id, family:families(membership_id))')
+      .select('id, member_id, pledge_type, created_at, member:members(first_name, last_name, family_id, family:families(membership_id))')
       .eq('event_id', eventId);
     if (error) return { data: null, error: error.message };
     return {
       data: (data ?? []).map(row => ({
         id: row.id,
         memberId: row.member_id,
+        pledgeType: row.pledge_type,
         createdAt: row.created_at,
         member: row.member
           ? {
@@ -427,21 +441,21 @@ class DatabaseService {
     };
   }
 
-  async createMealSignup(memberId, eventDate, eventId) {
+  async createMealSignup(memberId, eventDate, eventId, pledgeType) {
     if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       const existing = demoMealSignups.find(s => s.memberId === memberId && s.eventId === eventId);
       if (existing) return { data: existing, error: null };
-      const signup = { id: `demo-signup-${Date.now()}`, memberId, eventDate, eventId, createdAt: new Date().toISOString() };
+      const signup = { id: `demo-signup-${Date.now()}`, memberId, eventDate, eventId, pledgeType, createdAt: new Date().toISOString() };
       demoMealSignups.push(signup);
       return { data: signup, error: null };
     }
     const { data, error } = await supabase
       .from('meal_signups')
-      .insert({ member_id: memberId, event_date: eventDate, event_id: eventId })
+      .insert({ member_id: memberId, event_date: eventDate, event_id: eventId, pledge_type: pledgeType })
       .select('id')
       .single();
-    if (error) return { data: null, error: error.message };
+    if (error) return { data: null, error: signupErrorMessage(error) };
     notifySignup('meal', 'created', memberId, eventDate, eventId);
     return { data: { id: data.id }, error: null };
   }
@@ -474,6 +488,44 @@ class DatabaseService {
     return { data: (data ?? []).map(row => row.event_id), error: null };
   }
 
+  // Which services in a range this member pledged for, and how. Their own rows
+  // are visible under RLS, so unlike the counts this needs no security-definer
+  // function — it reads the table directly.
+  async getMyMealPledgesInRange(memberId, fromDate, toDate) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const pledges = demoMealSignups
+        .filter(s => s.memberId === memberId && s.eventDate >= fromDate && s.eventDate <= toDate && s.eventId)
+        .map(s => ({ eventId: s.eventId, pledgeType: s.pledgeType ?? null }));
+      return { data: pledges, error: null };
+    }
+    const { data, error } = await supabase
+      .from('meal_signups')
+      .select('event_id, pledge_type')
+      .eq('member_id', memberId)
+      .gte('event_date', fromDate)
+      .lte('event_date', toDate);
+    if (error) return { data: null, error: error.message };
+    return {
+      data: (data ?? [])
+        .filter(row => row.event_id)
+        .map(row => ({ eventId: row.event_id, pledgeType: row.pledge_type })),
+      error: null,
+    };
+  }
+
+  // Whether one member has already taken the whole service on. RLS hides other
+  // members' rows, so this cannot be read off the roster.
+  async getMealFullPledge(eventId) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return { data: demoMealSignups.some(s => s.eventId === eventId && s.pledgeType === 'full'), error: null };
+    }
+    const { data, error } = await supabase.rpc('meal_full_pledge_for_event', { p_event_id: eventId });
+    if (error) return { data: false, error: error.message };
+    return { data: Boolean(data), error: null };
+  }
+
   async getFlowerSignupCount(eventId) {
     if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -494,6 +546,7 @@ class DatabaseService {
           return {
             id: s.id,
             memberId: s.memberId,
+            pledgeType: s.pledgeType,
             createdAt: s.createdAt,
             member: m ? { firstName: m.firstName, lastName: m.lastName, familyId: m.familyId } : null,
           };
@@ -502,13 +555,14 @@ class DatabaseService {
     }
     const { data, error } = await supabase
       .from('flower_signups')
-      .select('id, member_id, created_at, member:members(first_name, last_name, family_id, family:families(membership_id))')
+      .select('id, member_id, pledge_type, created_at, member:members(first_name, last_name, family_id, family:families(membership_id))')
       .eq('event_id', eventId);
     if (error) return { data: null, error: error.message };
     return {
       data: (data ?? []).map(row => ({
         id: row.id,
         memberId: row.member_id,
+        pledgeType: row.pledge_type,
         createdAt: row.created_at,
         member: row.member
           ? {
@@ -523,21 +577,21 @@ class DatabaseService {
     };
   }
 
-  async createFlowerSignup(memberId, eventDate, eventId) {
+  async createFlowerSignup(memberId, eventDate, eventId, pledgeType) {
     if (isDemoSession()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       const existing = demoFlowerSignups.find(s => s.memberId === memberId && s.eventId === eventId);
       if (existing) return { data: existing, error: null };
-      const signup = { id: `demo-signup-${Date.now()}`, memberId, eventDate, eventId, createdAt: new Date().toISOString() };
+      const signup = { id: `demo-signup-${Date.now()}`, memberId, eventDate, eventId, pledgeType, createdAt: new Date().toISOString() };
       demoFlowerSignups.push(signup);
       return { data: signup, error: null };
     }
     const { data, error } = await supabase
       .from('flower_signups')
-      .insert({ member_id: memberId, event_date: eventDate, event_id: eventId })
+      .insert({ member_id: memberId, event_date: eventDate, event_id: eventId, pledge_type: pledgeType })
       .select('id')
       .single();
-    if (error) return { data: null, error: error.message };
+    if (error) return { data: null, error: signupErrorMessage(error) };
     notifySignup('flower', 'created', memberId, eventDate, eventId);
     return { data: { id: data.id }, error: null };
   }
@@ -568,6 +622,44 @@ class DatabaseService {
     const { data, error } = await supabase.rpc('flower_signup_event_ids_in_range', { p_from: fromDate, p_to: toDate });
     if (error) return { data: null, error: error.message };
     return { data: (data ?? []).map(row => row.event_id), error: null };
+  }
+
+  // Which services in a range this member pledged for, and how. Their own rows
+  // are visible under RLS, so unlike the counts this needs no security-definer
+  // function — it reads the table directly.
+  async getMyFlowerPledgesInRange(memberId, fromDate, toDate) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const pledges = demoFlowerSignups
+        .filter(s => s.memberId === memberId && s.eventDate >= fromDate && s.eventDate <= toDate && s.eventId)
+        .map(s => ({ eventId: s.eventId, pledgeType: s.pledgeType ?? null }));
+      return { data: pledges, error: null };
+    }
+    const { data, error } = await supabase
+      .from('flower_signups')
+      .select('event_id, pledge_type')
+      .eq('member_id', memberId)
+      .gte('event_date', fromDate)
+      .lte('event_date', toDate);
+    if (error) return { data: null, error: error.message };
+    return {
+      data: (data ?? [])
+        .filter(row => row.event_id)
+        .map(row => ({ eventId: row.event_id, pledgeType: row.pledge_type })),
+      error: null,
+    };
+  }
+
+  // Whether one member has already taken the whole service on. RLS hides other
+  // members' rows, so this cannot be read off the roster.
+  async getFlowerFullPledge(eventId) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return { data: demoFlowerSignups.some(s => s.eventId === eventId && s.pledgeType === 'full'), error: null };
+    }
+    const { data, error } = await supabase.rpc('flower_full_pledge_for_event', { p_event_id: eventId });
+    if (error) return { data: false, error: error.message };
+    return { data: Boolean(data), error: null };
   }
 
   // ── Church-provided services ────────────────────────────────────────────────

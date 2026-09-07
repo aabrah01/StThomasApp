@@ -2,11 +2,24 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createBrowserSupabase } from '@/lib/supabase';
-import type { FlowerSignup } from '@/lib/types';
+import type { FlowerSignup, PledgeType } from '@/lib/types';
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
 type Row = FlowerSignup;
+
+function PledgeTag({ type }: { type: PledgeType }) {
+  if (!type) return null;
+  return (
+    <span
+      className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+        type === 'full' ? 'bg-[#7E282F]/10 text-[#7E282F]' : 'bg-gray-100 text-gray-600'
+      }`}
+    >
+      {type === 'full' ? 'Donating it' : 'Sharing'}
+    </span>
+  );
+}
 
 function groupByDate(signups: Row[]): { date: string; rows: Row[] }[] {
   const map = new Map<string, Row[]>();
@@ -45,7 +58,7 @@ export default function FlowerSignupsPage() {
     const supabase = createBrowserSupabase();
     const { data, error: fetchError } = await supabase
       .from('flower_signups')
-      .select('id, event_date, created_at, member:members(id, first_name, last_name, family:families(family_name))')
+      .select('id, event_date, pledge_type, created_at, member:members(id, first_name, last_name, family:families(family_name))')
       .order('event_date', { ascending: true });
 
     if (fetchError) {
@@ -58,6 +71,7 @@ export default function FlowerSignupsPage() {
           memberId: row.member?.id ?? '',
           memberName: row.member ? `${row.member.first_name} ${row.member.last_name}` : '—',
           familyName: (row.member?.family as any)?.family_name ?? '—',
+          pledgeType: row.pledge_type ?? null,
           createdAt: row.created_at,
         }))
       );
@@ -110,6 +124,7 @@ export default function FlowerSignupsPage() {
                       <div>
                         <div className="font-medium text-gray-900">{row.memberName}</div>
                         <div className="text-gray-600 text-sm">{row.familyName}</div>
+                        <div className="mt-1"><PledgeTag type={row.pledgeType} /></div>
                         <div className="text-gray-500 text-xs mt-1">
                           {new Date(row.createdAt).toLocaleString('en-US', {
                             month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
@@ -135,6 +150,7 @@ export default function FlowerSignupsPage() {
                     <tr className="border-b border-gray-100 bg-gray-50">
                       <th className="text-left px-4 py-3 font-semibold text-gray-600">Member</th>
                       <th className="text-left px-4 py-3 font-semibold text-gray-600">Family</th>
+                      <th className="text-left px-4 py-3 font-semibold text-gray-600">Pledge</th>
                       <th className="text-left px-4 py-3 font-semibold text-gray-600">Signed Up At</th>
                       <th className="px-4 py-3" />
                     </tr>
@@ -147,6 +163,7 @@ export default function FlowerSignupsPage() {
                       >
                         <td className="px-4 py-3 font-medium text-gray-900">{row.memberName}</td>
                         <td className="px-4 py-3 text-gray-600">{row.familyName}</td>
+                        <td className="px-4 py-3"><PledgeTag type={row.pledgeType} /></td>
                         <td className="px-4 py-3 text-gray-500">
                           {new Date(row.createdAt).toLocaleString('en-US', {
                             month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
