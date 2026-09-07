@@ -9,6 +9,8 @@ export type ChurchContact = {
   name: string;
   phone: string;
   email: string;
+  notifyMeal: boolean;
+  notifyFlower: boolean;
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -27,12 +29,15 @@ function ContactRow({
   const [name, setName] = useState(contact.name);
   const [phone, setPhone] = useState(contact.phone);
   const [email, setEmail] = useState(contact.email);
+  const [notifyMeal, setNotifyMeal] = useState(contact.notifyMeal);
+  const [notifyFlower, setNotifyFlower] = useState(contact.notifyFlower);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
   const dirty =
-    name !== contact.name || phone !== contact.phone || email !== contact.email;
+    name !== contact.name || phone !== contact.phone || email !== contact.email ||
+    notifyMeal !== contact.notifyMeal || notifyFlower !== contact.notifyFlower;
 
   const save = async () => {
     if (DEMO_MODE || saving || !dirty) return;
@@ -43,11 +48,11 @@ function ContactRow({
     const res = await fetch('/api/contacts', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role: contact.role, name, phone, email }),
+      body: JSON.stringify({ role: contact.role, name, phone, email, notifyMeal, notifyFlower }),
     });
 
     if (res.ok) {
-      onSaved({ role: contact.role, name, phone, email });
+      onSaved({ role: contact.role, name, phone, email, notifyMeal, notifyFlower });
       setSaved(true);
     } else {
       const data = await res.json().catch(() => ({}));
@@ -86,6 +91,35 @@ function ContactRow({
           className="border border-gray-200 rounded-lg px-3 py-2 text-sm disabled:bg-gray-50"
         />
       </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+        <span className="text-xs text-gray-500">Sign-up emails:</span>
+        <label className="flex items-center gap-1.5 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={notifyMeal}
+            onChange={e => { setNotifyMeal(e.target.checked); setSaved(false); }}
+            disabled={DEMO_MODE}
+            className="h-4 w-4 rounded border-gray-300 accent-[#7E282F] disabled:opacity-40"
+          />
+          Food
+        </label>
+        <label className="flex items-center gap-1.5 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={notifyFlower}
+            onChange={e => { setNotifyFlower(e.target.checked); setSaved(false); }}
+            disabled={DEMO_MODE}
+            className="h-4 w-4 rounded border-gray-300 accent-[#7E282F] disabled:opacity-40"
+          />
+          Flowers
+        </label>
+        {/* A ticked box with nowhere to send to is silently skipped by the
+            Edge Function, so say so rather than letting it look configured. */}
+        {(notifyMeal || notifyFlower) && !email.trim() && (
+          <span className="text-xs text-amber-600">Add an email address to receive these</span>
+        )}
+      </div>
+
       <div className="flex items-center gap-3 mt-2">
         <button
           onClick={save}
@@ -117,6 +151,7 @@ export default function ContactsSection({
       <h2 className="font-semibold text-gray-900">Church Contacts</h2>
       <p className="text-xs text-gray-500 mt-0.5 mb-2">
         Shown on the Contact screen in the mobile app. Leave a field blank to hide it.
+        Tick Food or Flowers to email this contact when a member pledges or cancels.
       </p>
       {contacts.map(contact => (
         <ContactRow key={contact.role} contact={contact} onSaved={handleSaved} />

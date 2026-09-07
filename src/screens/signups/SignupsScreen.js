@@ -57,7 +57,7 @@ const SignupsScreen = ({ navigation }) => {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const commonStyles = useCommonStyles();
-  const { appSettings, refreshAppSettings } = useAuth();
+  const { member, appSettings, refreshAppSettings } = useAuth();
   const {
     events,
     loading: eventsLoading,
@@ -75,6 +75,10 @@ const SignupsScreen = ({ navigation }) => {
   const [flowerEventIds, setFlowerEventIds] = useState(new Set());
   const [mealProvidedIds, setMealProvidedIds] = useState(new Set());
   const [flowerProvidedIds, setFlowerProvidedIds] = useState(new Set());
+  // event id → pledge type, so a row can say whether you are covering the
+  // service on your own or sharing it
+  const [myMealPledges, setMyMealPledges] = useState(new Map());
+  const [myFlowerPledges, setMyFlowerPledges] = useState(new Map());
   const [expandedId, setExpandedId] = useState(null);
   const [cardRefreshKey, setCardRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -126,7 +130,8 @@ const SignupsScreen = ({ navigation }) => {
     return groups;
   }, [services]);
 
-  // Three queries for the whole screen, regardless of how many services are listed
+  // A handful of queries for the whole screen, regardless of how many services
+  // are listed
   const loadSignupIds = useCallback(async () => {
     if (services.length === 0) return;
     const from = services[0].date;
@@ -141,6 +146,20 @@ const SignupsScreen = ({ navigation }) => {
       if (data) setFlowerEventIds(new Set(data));
     }
 
+    // The member's own pledges. Separate from the counts above, which are
+    // totals with no identity attached — an office account has no member
+    // record and so has nothing of its own to mark.
+    if (member?.id) {
+      if (mealEnabled) {
+        const { data } = await databaseService.getMyMealPledgesInRange(member.id, from, to);
+        if (data) setMyMealPledges(new Map(data.map(p => [p.eventId, p.pledgeType])));
+      }
+      if (flowerEnabled) {
+        const { data } = await databaseService.getMyFlowerPledgesInRange(member.id, from, to);
+        if (data) setMyFlowerPledges(new Map(data.map(p => [p.eventId, p.pledgeType])));
+      }
+    }
+
     // One query covers both kinds — a collapsed row has to say the church is
     // providing, not "No sign-ups yet", which reads as nobody having volunteered.
     const { data: provisions } = await databaseService.getServiceProvisionsInRange(from, to);
@@ -148,7 +167,7 @@ const SignupsScreen = ({ navigation }) => {
       setMealProvidedIds(new Set(provisions.filter(p => p.kind === 'meal').map(p => p.eventId)));
       setFlowerProvidedIds(new Set(provisions.filter(p => p.kind === 'flower').map(p => p.eventId)));
     }
-  }, [services, mealEnabled, flowerEnabled]);
+  }, [services, mealEnabled, flowerEnabled, member?.id]);
 
   useEffect(() => {
     loadSignupIds();
@@ -250,10 +269,17 @@ const SignupsScreen = ({ navigation }) => {
             const expanded = expandedId === id;
             const providedMeal = mealEnabled && mealProvidedIds.has(id);
             const providedFlower = flowerEnabled && flowerProvidedIds.has(id);
-            // A church-provided service supersedes the pledge badge: nobody is
-            // being asked to sign up, so the count is not the story.
-            const hasMeal = mealEnabled && !providedMeal && mealEventIds.has(id);
-            const hasFlower = flowerEnabled && !providedFlower && flowerEventIds.has(id);
+            // Your own pledge is the more useful fact about a service than the
+            // tally, so it takes the badge — but a church-provided service
+            // supersedes both: nobody is being asked to sign up.
+            const mineMeal = mealEnabled && !providedMeal && myMealPledges.has(id);
+            const mineFlower = flowerEnabled && !providedFlower && myFlowerPledges.has(id);
+            // A full pledge closes the service to everyone else, so "only" is
+            // the whole story. A shared one leaves room for others to join.
+            const onlyMeal = mineMeal && myMealPledges.get(id) === 'full';
+            const onlyFlower = mineFlower && myFlowerPledges.get(id) === 'full';
+            const hasMeal = mealEnabled && !providedMeal && !mineMeal && mealEventIds.has(id);
+            const hasFlower = flowerEnabled && !providedFlower && !mineFlower && flowerEventIds.has(id);
 
             return (
               <View style={styles.dateBlock}>
@@ -276,36 +302,52 @@ const SignupsScreen = ({ navigation }) => {
                     <View style={styles.badgeRow}>
                       {providedMeal && (
                         <View style={[styles.badge, styles.badgeChurch]}>
-                          <Ionicons name="restaurant-outline" size={12} color="#FFFFFF" />
-                          <Text style={[styles.badgeText, styles.badgeTextChurch]}>Food by church</Text>
+                          <Ionicons name="restaurant-outline" size={14} color="#FFFFFF" />
+                          <Text style={[styles.badgeText, styles.badgeTextChurch]}>Food By Church</Text>
                         </View>
                       )}
                       {providedFlower && (
                         <View style={[styles.badge, styles.badgeChurch]}>
-                          <Ionicons name="flower-outline" size={12} color="#FFFFFF" />
-                          <Text style={[styles.badgeText, styles.badgeTextChurch]}>Flowers by church</Text>
+                          <Ionicons name="flower-outline" size={14} color="#FFFFFF" />
+                          <Text style={[styles.badgeText, styles.badgeTextChurch]}>Flowers By Church</Text>
+                        </View>
+                      )}
+                      {mineMeal && (
+                        <View style={[styles.badge, styles.badgeMine]}>
+                          <Ionicons name="checkmark-circle" size={14} color={theme.colors.accent} />
+                          <Text style={[styles.badgeText, styles.badgeTextMine]}>
+                            {onlyMeal ? 'Food ONLY By You' : 'Food By You'}
+                          </Text>
+                        </View>
+                      )}
+                      {mineFlower && (
+                        <View style={[styles.badge, styles.badgeMine]}>
+                          <Ionicons name="checkmark-circle" size={14} color={theme.colors.accent} />
+                          <Text style={[styles.badgeText, styles.badgeTextMine]}>
+                            {onlyFlower ? 'Flowers ONLY By You' : 'Flowers By You'}
+                          </Text>
                         </View>
                       )}
                       {hasMeal && (
                         <View style={styles.badge}>
-                          <Ionicons name="restaurant-outline" size={12} color={theme.colors.accent} />
+                          <Ionicons name="restaurant-outline" size={14} color={theme.colors.accent} />
                           <Text style={styles.badgeText}>Food</Text>
                         </View>
                       )}
                       {hasFlower && (
                         <View style={styles.badge}>
-                          <Ionicons name="flower-outline" size={12} color={theme.colors.accent} />
+                          <Ionicons name="flower-outline" size={14} color={theme.colors.accent} />
                           <Text style={styles.badgeText}>Flowers</Text>
                         </View>
                       )}
-                      {!hasMeal && !hasFlower && !providedMeal && !providedFlower && (
-                        <Text style={styles.badgeEmpty}>No sign-ups yet</Text>
+                      {!mineMeal && !mineFlower && !hasMeal && !hasFlower && !providedMeal && !providedFlower && (
+                        <Text style={styles.badgeEmpty}>No Sign-Ups Yet</Text>
                       )}
                     </View>
                   </View>
                   <Ionicons
                     name={expanded ? 'chevron-up' : 'chevron-down'}
-                    size={18}
+                    size={20}
                     color={theme.colors.textLight}
                   />
                 </TouchableOpacity>
@@ -360,7 +402,7 @@ const makeStyles = (theme) => StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   emptyText: {
-    fontSize: theme.fonts.sizes.md,
+    fontSize: theme.fonts.sizes.lg,
     color: theme.colors.textSecondary,
     fontWeight: '500',
   },
@@ -368,7 +410,7 @@ const makeStyles = (theme) => StyleSheet.create({
     padding: theme.spacing.md,
   },
   monthHeader: {
-    fontSize: theme.fonts.sizes.lg,
+    fontSize: theme.fonts.sizes.xl,
     fontWeight: '700',
     color: theme.colors.text,
     textTransform: 'uppercase',
@@ -396,12 +438,12 @@ const makeStyles = (theme) => StyleSheet.create({
     flex: 1,
   },
   dateLabel: {
-    fontSize: theme.fonts.sizes.md,
+    fontSize: theme.fonts.sizes.lg,
     fontWeight: '700',
     color: theme.colors.text,
   },
   eventTitle: {
-    fontSize: theme.fonts.sizes.sm,
+    fontSize: theme.fonts.sizes.md,
     color: theme.colors.accent,
     fontWeight: '600',
     marginTop: 1,
@@ -428,8 +470,17 @@ const makeStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.colors.accent,
     marginTop: 2,
   },
+  // Outlined rather than filled: it has to be tellable apart from the solid
+  // church badge at a glance, without bringing a second colour into a palette
+  // that is otherwise burgundy on cream.
+  badgeMine: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+    marginTop: 2,
+  },
   badgeText: {
-    fontSize: theme.fonts.sizes.xs,
+    fontSize: theme.fonts.sizes.sm,
     fontWeight: '600',
     color: theme.colors.accent,
     marginLeft: 4,
@@ -438,8 +489,11 @@ const makeStyles = (theme) => StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
   },
+  badgeTextMine: {
+    fontWeight: '700',
+  },
   badgeEmpty: {
-    fontSize: theme.fonts.sizes.xs,
+    fontSize: theme.fonts.sizes.sm,
     color: theme.colors.textLight,
   },
 });

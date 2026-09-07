@@ -16,7 +16,7 @@ export default async function DashboardPage() {
   let enableDocuments = false;
   let assemblyDocsFolderId = '';
   let contacts: ChurchContact[] = CONTACT_ROLES.map(role => ({
-    role, name: '', phone: '', email: '',
+    role, name: '', phone: '', email: '', notifyMeal: false, notifyFlower: false,
   }));
 
   if (DEMO_MODE) {
@@ -34,7 +34,7 @@ export default async function DashboardPage() {
       // members sharing an email would be counted twice. Dedupe on user_id.
       supabase.from('member_users').select('user_id'),
       supabase.from('app_settings').select('enable_meal_signup, enable_flower_signup, enable_documents, assembly_docs_folder_id').eq('id', 'config').single(),
-      supabase.from('church_contacts').select('role, name, phone, email').order('display_order'),
+      supabase.from('church_contacts').select('role, name, phone, email, notify_meal, notify_flower').order('display_order'),
     ]);
     familyCount = fc.count ?? 0;
     memberCount = mc.count ?? 0;
@@ -52,6 +52,8 @@ export default async function DashboardPage() {
       name: byRole.get(role)?.name ?? '',
       phone: byRole.get(role)?.phone ?? '',
       email: byRole.get(role)?.email ?? '',
+      notifyMeal: byRole.get(role)?.notify_meal ?? false,
+      notifyFlower: byRole.get(role)?.notify_flower ?? false,
     }));
   }
 
