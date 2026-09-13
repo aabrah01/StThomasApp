@@ -58,6 +58,14 @@ export const HOME_CARDS = [
     target: 'Contact',
   },
   {
+    key: 'photos',
+    label: 'Photos',
+    sublabel: 'Parish albums',
+    icon: 'images-outline',
+    flag: ['enablePhotos'],
+    target: 'Photos',
+  },
+  {
     key: 'media',
     label: 'Media',
     // Generic on purpose — YouTube is the only source today, not necessarily the only one

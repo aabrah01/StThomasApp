@@ -21,6 +21,7 @@ import SignupsScreen from '../screens/signups/SignupsScreen';
 import MediaScreen from '../screens/media/MediaScreen';
 import ContactScreen from '../screens/contact/ContactScreen';
 import DocumentsScreen from '../screens/documents/DocumentsScreen';
+import PhotosScreen from '../screens/photos/PhotosScreen';
 import DocumentViewerScreen from '../screens/documents/DocumentViewerScreen';
 
 const Stack = createStackNavigator();
@@ -51,6 +52,7 @@ const AppStack = () => {
       <Stack.Screen name="Media" component={MediaScreen} />
       <Stack.Screen name="Contact" component={ContactScreen} />
       <Stack.Screen name="Documents" component={DocumentsScreen} />
+      <Stack.Screen name="Photos" component={PhotosScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
 
       {/* Drill-downs */}

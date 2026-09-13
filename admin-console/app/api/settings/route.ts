@@ -21,7 +21,7 @@ export async function GET() {
   const supabase = createAdminSupabase();
   const { data } = await supabase
     .from('app_settings')
-    .select('enable_meal_signup, enable_flower_signup, enable_documents, assembly_docs_folder_id')
+    .select('enable_meal_signup, enable_flower_signup, enable_documents, assembly_docs_folder_id, enable_photos')
     .eq('id', 'config')
     .single();
 
@@ -30,6 +30,7 @@ export async function GET() {
     enableFlowerSignup: data?.enable_flower_signup ?? false,
     enableDocuments: data?.enable_documents ?? false,
     assemblyDocsFolderId: data?.assembly_docs_folder_id ?? '',
+    enablePhotos: data?.enable_photos ?? false,
   });
 }
 
@@ -38,7 +39,7 @@ export async function PATCH(request: Request) {
   if (isError(auth)) return auth;
 
   const body = await request.json();
-  const { enableMealSignup, enableFlowerSignup, enableDocuments, assemblyDocsFolderId } = body;
+  const { enableMealSignup, enableFlowerSignup, enableDocuments, assemblyDocsFolderId, enablePhotos } = body;
 
   const updates: Record<string, boolean | string | null> = {};
   if (enableMealSignup !== undefined) {
@@ -58,6 +59,12 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'enableDocuments must be a boolean' }, { status: 400 });
     }
     updates.enable_documents = enableDocuments;
+  }
+  if (enablePhotos !== undefined) {
+    if (typeof enablePhotos !== 'boolean') {
+      return NextResponse.json({ error: 'enablePhotos must be a boolean' }, { status: 400 });
+    }
+    updates.enable_photos = enablePhotos;
   }
   if (assemblyDocsFolderId !== undefined) {
     if (typeof assemblyDocsFolderId !== 'string') {

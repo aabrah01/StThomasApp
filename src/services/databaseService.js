@@ -110,6 +110,9 @@ const mapAppSettings = (row) => ({
   enableFlowerSignup: row.enable_flower_signup ?? false,
   enableDocuments: row.enable_documents ?? false,
   assemblyDocsFolderId: row.assembly_docs_folder_id ?? null,
+  enablePhotos: row.enable_photos ?? false,
+  photosSiteUrl: row.photos_site_url ?? null,
+  photosParentPageId: row.photos_parent_page_id ?? null,
 });
 
 const mapContribution = (row) => ({
