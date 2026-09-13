@@ -19,7 +19,15 @@ import ScreenHeader from '../../components/common/ScreenHeader';
 import { useTheme } from '../../hooks/useTheme';
 import { useCommonStyles } from '../../styles/commonStyles';
 
-const todayString = new Date().toISOString().split('T')[0];
+// Local, not UTC: toISOString() reads the UTC date, which from about 8pm Eastern
+// is already tomorrow — so today's liturgy dropped off this list hours before it
+// had even happened. Same form as CalendarScreen's.
+const todayString = (() => {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+})();
 
 // Only the Divine Liturgy takes food and flower sign-ups. Calendar titles read
 // "Holy Qurbana", "Palm Sunday – Holy Qurbana", "Divine Liturgy" and the like.
@@ -359,6 +367,7 @@ const SignupsScreen = ({ navigation }) => {
                       <FoodDonationCard
                         eventDate={date}
                         eventId={id}
+                        startDate={startDate}
                         onSignupChange={handleSignupChange}
                         refreshKey={cardRefreshKey}
                       />
@@ -367,6 +376,7 @@ const SignupsScreen = ({ navigation }) => {
                       <FlowerDonationCard
                         eventDate={date}
                         eventId={id}
+                        startDate={startDate}
                         onSignupChange={handleSignupChange}
                         refreshKey={cardRefreshKey}
                       />
