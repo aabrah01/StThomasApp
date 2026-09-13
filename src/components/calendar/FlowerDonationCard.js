@@ -19,7 +19,20 @@ const longDate = (date) =>
     day: 'numeric',
   });
 
-const FlowerDonationCard = React.memo(({ eventDate, eventId, onSignupChange, refreshKey }) => {
+// A service is past once it has begun. The date-only comparison this replaced
+// left the whole of Sunday open, so a member could pledge flowers at 10:44 for a
+// liturgy that had started at 9:00 — and since it read the UTC date, it also
+// flipped the current day to "past" about four hours early each evening here.
+//
+// Sign-ups only ever list timed liturgies, so startDate normally carries a time.
+// The fallback keeps a dateless event open until its local day is over, which is
+// the old behaviour minus the UTC drift.
+const isServicePast = (eventDate, startDate) =>
+  startDate?.includes('T')
+    ? new Date(startDate) <= new Date()
+    : new Date(`${eventDate}T23:59:59`) < new Date();
+
+const FlowerDonationCard = React.memo(({ eventDate, eventId, startDate, onSignupChange, refreshKey }) => {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { member, isAdmin } = useAuth();
@@ -60,7 +73,7 @@ const FlowerDonationCard = React.memo(({ eventDate, eventId, onSignupChange, ref
     load();
   }, [load, refreshKey]);
 
-  const isPast = eventDate < new Date().toISOString().split('T')[0];
+  const isPast = isServicePast(eventDate, startDate);
 
   const ownSignup = signups.find(s => s.memberId === member?.id);
   const familySignups = signups.filter(

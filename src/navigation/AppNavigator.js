@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../hooks/useTheme';
+import { useUpdatePrompt } from '../hooks/useUpdatePrompt';
 import BottomBar from '../components/common/BottomBar';
 
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -30,6 +31,13 @@ const Stack = createStackNavigator();
 // navigator rather than a tab navigator — a tab has nothing beneath it to pop to.
 const AppStack = () => {
   const theme = useTheme();
+
+  // Here rather than in AppNavigator, so update checks only run once a member
+  // is signed in: this stack is mounted only on the authenticated branch, and
+  // the listener is torn down on sign-out. Interrupting someone part-way
+  // through entering a PIN with a restart prompt is the last thing to do.
+  useUpdatePrompt();
+
   return (
     <Stack.Navigator
       initialRouteName="Home"
