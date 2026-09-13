@@ -31,6 +31,13 @@ const Stack = createStackNavigator();
 // navigator rather than a tab navigator — a tab has nothing beneath it to pop to.
 const AppStack = () => {
   const theme = useTheme();
+
+  // Here rather than in AppNavigator, so update checks only run once a member
+  // is signed in: this stack is mounted only on the authenticated branch, and
+  // the listener is torn down on sign-out. Interrupting someone part-way
+  // through entering a PIN with a restart prompt is the last thing to do.
+  useUpdatePrompt();
+
   return (
     <Stack.Navigator
       initialRouteName="Home"
@@ -77,10 +84,6 @@ const AppNavigator = () => {
   const theme = useTheme();
   const navigationRef = useNavigationContainerRef();
   const [routeName, setRouteName] = useState('Home');
-
-  // Above the `if (loading)` return below, so the listener is registered for
-  // signed-out members too — the login screen is a foreground like any other.
-  useUpdatePrompt();
 
   const trackRoute = useCallback(() => {
     setRouteName(navigationRef.getCurrentRoute()?.name ?? 'Home');
