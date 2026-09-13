@@ -47,15 +47,18 @@ export default function FeaturesSection({
   initialEnableFlowerSignup,
   initialEnableDocuments,
   initialAssemblyDocsFolderId,
+  initialEnablePhotos,
 }: {
   initialEnableMealSignup: boolean;
   initialEnableFlowerSignup: boolean;
   initialEnableDocuments: boolean;
   initialAssemblyDocsFolderId: string;
+  initialEnablePhotos: boolean;
 }) {
   const [enableMealSignup, setEnableMealSignup] = useState(initialEnableMealSignup);
   const [enableFlowerSignup, setEnableFlowerSignup] = useState(initialEnableFlowerSignup);
   const [enableDocuments, setEnableDocuments] = useState(initialEnableDocuments);
+  const [enablePhotos, setEnablePhotos] = useState(initialEnablePhotos);
   const [folderInput, setFolderInput] = useState(initialAssemblyDocsFolderId);
   const [savedFolder, setSavedFolder] = useState(initialAssemblyDocsFolderId);
   const [saving, setSaving] = useState(false);
@@ -63,7 +66,7 @@ export default function FeaturesSection({
   const [error, setError] = useState('');
 
   const toggle = async (
-    key: 'enableMealSignup' | 'enableFlowerSignup' | 'enableDocuments',
+    key: 'enableMealSignup' | 'enableFlowerSignup' | 'enableDocuments' | 'enablePhotos',
     current: boolean,
     setValue: (v: boolean) => void,
   ) => {
@@ -142,6 +145,14 @@ export default function FeaturesSection({
         checked={enableDocuments}
         disabled={DEMO_MODE || saving}
         onToggle={() => toggle('enableDocuments', enableDocuments, setEnableDocuments)}
+      />
+
+      <FeatureToggle
+        label="Photos"
+        description="Show a Photos menu in the app with the parish albums listed on the church website"
+        checked={enablePhotos}
+        disabled={DEMO_MODE || saving}
+        onToggle={() => toggle('enablePhotos', enablePhotos, setEnablePhotos)}
       />
 
       <div className="pt-4">

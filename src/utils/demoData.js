@@ -503,6 +503,9 @@ export const demoAppSettings = {
   enableFlowerSignup: true,
   enableDocuments: true,
   assemblyDocsFolderId: 'demo-folder',
+  enablePhotos: true,
+  photosSiteUrl: 'https://example.org',
+  photosParentPageId: '1',
 };
 
 // Demo assembly documents — shown in demo mode in place of a Drive folder listing
@@ -510,6 +513,15 @@ export const demoDocuments = [
   { id: 'demo-doc-1', name: 'General Assembly Agenda', modifiedTime: '2026-06-20T14:00:00Z' },
   { id: 'demo-doc-2', name: 'Annual Financial Report', modifiedTime: '2026-06-18T09:30:00Z' },
   { id: 'demo-doc-3', name: 'Previous Meeting Minutes', modifiedTime: '2026-06-15T16:45:00Z' },
+];
+
+// Demo photo albums — shown in demo mode in place of the website's album index.
+// No cover urls: demo mode makes no network calls, so the grid falls back to
+// its placeholder tile.
+export const demoPhotoAlbums = [
+  { id: 'demo-album-1', year: '2026', title: '2026 Holy Week', coverUrl: null, shareUrl: 'https://photos.app.goo.gl/demo1' },
+  { id: 'demo-album-2', year: '2026', title: '2026 Parish Day', coverUrl: null, shareUrl: 'https://photos.app.goo.gl/demo2' },
+  { id: 'demo-album-3', year: '2025', title: '2025 Sunday School Education Day', coverUrl: null, shareUrl: 'https://photos.app.goo.gl/demo3' },
 ];
 
 // Keyed by YYYY-MM-DD — each entry is a public YouTube video for that Sunday's homily

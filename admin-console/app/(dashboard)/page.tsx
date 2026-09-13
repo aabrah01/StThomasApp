@@ -15,6 +15,7 @@ export default async function DashboardPage() {
   let enableFlowerSignup = false;
   let enableDocuments = false;
   let assemblyDocsFolderId = '';
+  let enablePhotos = false;
   let contacts: ChurchContact[] = CONTACT_ROLES.map(role => ({
     role, name: '', phone: '', email: '', notifyMeal: false, notifyFlower: false,
   }));
@@ -33,7 +34,7 @@ export default async function DashboardPage() {
       // Rows, not people: a member_users row per member, so anyone linked to two
       // members sharing an email would be counted twice. Dedupe on user_id.
       supabase.from('member_users').select('user_id'),
-      supabase.from('app_settings').select('enable_meal_signup, enable_flower_signup, enable_documents, assembly_docs_folder_id').eq('id', 'config').single(),
+      supabase.from('app_settings').select('enable_meal_signup, enable_flower_signup, enable_documents, assembly_docs_folder_id, enable_photos').eq('id', 'config').single(),
       supabase.from('church_contacts').select('role, name, phone, email, notify_meal, notify_flower').order('display_order'),
     ]);
     familyCount = fc.count ?? 0;
@@ -44,6 +45,7 @@ export default async function DashboardPage() {
     enableFlowerSignup = settings.data?.enable_flower_signup ?? false;
     enableDocuments = settings.data?.enable_documents ?? false;
     assemblyDocsFolderId = settings.data?.assembly_docs_folder_id ?? '';
+    enablePhotos = settings.data?.enable_photos ?? false;
 
     // Seeded rows may be missing if the migration hasn't run — fall back to blanks
     const byRole = new Map((contactRows.data ?? []).map(r => [r.role, r]));
@@ -97,6 +99,7 @@ export default async function DashboardPage() {
         initialEnableFlowerSignup={enableFlowerSignup}
         initialEnableDocuments={enableDocuments}
         initialAssemblyDocsFolderId={assemblyDocsFolderId}
+        initialEnablePhotos={enablePhotos}
       />
 
       <ContactsSection initialContacts={contacts} />
