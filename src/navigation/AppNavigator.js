@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../hooks/useTheme';
+import { useUpdatePrompt } from '../hooks/useUpdatePrompt';
 import BottomBar from '../components/common/BottomBar';
 
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -76,6 +77,10 @@ const AppNavigator = () => {
   const theme = useTheme();
   const navigationRef = useNavigationContainerRef();
   const [routeName, setRouteName] = useState('Home');
+
+  // Above the `if (loading)` return below, so the listener is registered for
+  // signed-out members too — the login screen is a foreground like any other.
+  useUpdatePrompt();
 
   const trackRoute = useCallback(() => {
     setRouteName(navigationRef.getCurrentRoute()?.name ?? 'Home');
