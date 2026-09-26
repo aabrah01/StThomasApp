@@ -70,14 +70,14 @@ export const DEMO_CLIENT_ERRORS: ClientError[] = [
 // Keyed by DEMO_USERS id — user2 has two devices so the expandable row shows.
 export const DEMO_DEVICES: Record<string, {
   deviceId: string; appVersion: string | null; updateId: string | null;
-  updateCreatedAt: string | null; platform: string | null;
+  updateCreatedAt: string | null; isEmbeddedLaunch: boolean | null; platform: string | null;
   osVersion: string | null; lastSeenAt: string;
 }[]> = {
   user1: [
-    { deviceId: 'dev-a', appVersion: '1.0.0', updateId: null, updateCreatedAt: null, platform: 'android', osVersion: '34', lastSeenAt: '2026-03-24T10:00:00Z' },
+    { deviceId: 'dev-a', appVersion: '1.0.0', updateId: null, updateCreatedAt: null, isEmbeddedLaunch: null, platform: 'android', osVersion: '34', lastSeenAt: '2026-03-24T10:00:00Z' },
   ],
   user2: [
-    { deviceId: 'dev-b', appVersion: '1.1.0', updateId: '9f3c1a72-5d84-4e19-b0c6-71a2ee5d4413', updateCreatedAt: '2026-08-12T10:00:00Z', platform: 'ios', osVersion: '18.2', lastSeenAt: '2026-03-20T09:00:00Z' },
-    { deviceId: 'dev-c', appVersion: '1.0.0', updateId: null, updateCreatedAt: null, platform: 'ios', osVersion: '17.4', lastSeenAt: '2026-02-11T18:02:00Z' },
+    { deviceId: 'dev-b', appVersion: '1.1.0', updateId: '9f3c1a72-5d84-4e19-b0c6-71a2ee5d4413', updateCreatedAt: '2026-08-12T10:00:00Z', isEmbeddedLaunch: false, platform: 'ios', osVersion: '18.2', lastSeenAt: '2026-03-20T09:00:00Z' },
+    { deviceId: 'dev-c', appVersion: '1.0.0', updateId: null, updateCreatedAt: null, isEmbeddedLaunch: null, platform: 'ios', osVersion: '17.4', lastSeenAt: '2026-02-11T18:02:00Z' },
   ],
 };

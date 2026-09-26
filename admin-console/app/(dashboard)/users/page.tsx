@@ -39,6 +39,7 @@ export default async function UsersPage() {
         appVersion: i.app_version,
         updateId: i.update_id,
         updateCreatedAt: i.update_created_at,
+        isEmbeddedLaunch: i.is_embedded_launch ?? null,
         platform: i.platform,
         osVersion: i.os_version,
         lastSeenAt: i.last_seen_at,

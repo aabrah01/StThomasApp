@@ -40,24 +40,38 @@ export interface Contribution {
 // app asked.
 export type PledgeType = 'full' | 'shared' | null;
 
-export interface MealSignup {
+// Food or flowers — the two sign-up tables have the same shape.
+export type SignupKind = 'meal' | 'flower';
+
+// A pledge is a member's, or a well-wisher's entered by name (donorName) —
+// never both.
+export interface Signup {
   id: string;
   eventDate: string;
-  memberId: string;
-  memberName: string;
-  familyName: string;
+  eventId: string | null;
+  memberId: string | null;
+  memberName: string | null;
+  membershipId: string | null;
+  familyName: string | null;
+  donorName: string | null;
   pledgeType: PledgeType;
   createdAt: string;
 }
 
-export interface FlowerSignup {
+// A timed Divine Liturgy on the parish calendar — what pledges are made for.
+export interface Service {
+  eventId: string;
+  date: string;         // YYYY-MM-DD, parish time
+  title: string;
+  startsAt: string;     // ISO date-time
+}
+
+// For picking who a pledge is for.
+export interface MemberOption {
   id: string;
-  eventDate: string;
-  memberId: string;
-  memberName: string;
-  familyName: string;
-  pledgeType: PledgeType;
-  createdAt: string;
+  name: string;
+  membershipId: string | null;
+  familyName: string | null;
 }
 
 export interface UserRole {

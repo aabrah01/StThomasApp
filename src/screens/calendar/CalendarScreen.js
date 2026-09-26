@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react';
 import { useDataReady } from '../../context/DataReadyContext';
 import {
   View,
@@ -7,6 +7,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   useWindowDimensions,
+  Animated,
+  PanResponder,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
@@ -32,6 +35,12 @@ const startOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
 const thisMonth = startOfMonth(new Date());
 
 const HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
+
+// Swipe between months. The grid is only claimed once a drag is clearly
+// sideways, so a tap still opens its day and an up/down drag does nothing.
+const SWIPE_START = 15;     // pt moved before it counts as a swipe
+const SWIPE_COMMIT = 0.25;  // share of the width that turns the page on release
+const SWIPE_FLICK = 0.5;    // or a release this fast (pt/ms), however short
 
 const CalendarScreen = ({ navigation }) => {
   const theme = useTheme();
@@ -92,11 +101,68 @@ const CalendarScreen = ({ navigation }) => {
     ensureMonthLoaded(monthDate.getFullYear(), monthDate.getMonth() + 1);
   }, [monthDate, ensureMonthLoaded]);
 
-  // Arrows rather than horizontal swipe: this screen sits on a stack whose
-  // swipe-back gesture owns that direction already.
   const shiftMonth = useCallback((delta) => {
     setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + delta, 1));
   }, []);
+
+  // Swiping left or right turns the month, alongside the arrows. The stack's own
+  // swipe-back is narrowed to the screen's very edge for this screen
+  // (AppNavigator), so a swipe starting on the Sunday column turns the month
+  // rather than leaving the calendar.
+  //
+  // The grid follows the finger, slides out, and the new month slides in from
+  // the far side once it has rendered — so the old month is never seen coming
+  // back in, and the direction always matches the finger.
+  const slide = useRef(new Animated.Value(0)).current;
+  const gridWidthRef = useRef(0);
+  const pendingSlideRef = useRef(0);   // +1 / -1 while a new month is sliding in
+  const animatingRef = useRef(false);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponderCapture: (_, g) =>
+      !animatingRef.current && Math.abs(g.dx) > SWIPE_START && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderMove: (_, g) => slide.setValue(g.dx),
+    onPanResponderRelease: (_, g) => {
+      const width = gridWidthRef.current;
+      const delta =
+        g.dx < -SWIPE_COMMIT * width || g.vx < -SWIPE_FLICK ? 1
+        : g.dx > SWIPE_COMMIT * width || g.vx > SWIPE_FLICK ? -1
+        : 0;
+      if (!delta || !width) {
+        Animated.spring(slide, { toValue: 0, useNativeDriver: true }).start();
+        return;
+      }
+      animatingRef.current = true;
+      Animated.timing(slide, {
+        toValue: -delta * width,
+        duration: 160,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }).start(() => {
+        pendingSlideRef.current = delta;
+        shiftMonth(delta);
+      });
+    },
+    onPanResponderTerminate: () => {
+      Animated.spring(slide, { toValue: 0, useNativeDriver: true }).start();
+    },
+  }), [slide, shiftMonth]);
+
+  // The new month has rendered off-screen: bring it in from the side the finger
+  // came from. A layout effect, so it is placed before that frame is painted.
+  useLayoutEffect(() => {
+    const delta = pendingSlideRef.current;
+    if (!delta) return;
+    pendingSlideRef.current = 0;
+    slide.setValue(delta * gridWidthRef.current);
+    Animated.timing(slide, {
+      toValue: 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => { animatingRef.current = false; });
+  }, [monthDate, slide]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -190,16 +256,22 @@ const CalendarScreen = ({ navigation }) => {
 
         <View
           style={styles.gridWrap}
-          onLayout={(e) => setGridHeight(e.nativeEvent.layout.height)}
+          onLayout={(e) => {
+            setGridHeight(e.nativeEvent.layout.height);
+            gridWidthRef.current = e.nativeEvent.layout.width;
+          }}
+          {...panResponder.panHandlers}
         >
           {gridHeight > 0 && (
-            <MonthGrid
-              monthDate={monthDate}
-              eventsByDate={eventsByDate}
-              height={gridHeight}
-              todayString={todayString}
-              onDayPress={setSheetDate}
-            />
+            <Animated.View style={[styles.slide, { transform: [{ translateX: slide }] }]}>
+              <MonthGrid
+                monthDate={monthDate}
+                eventsByDate={eventsByDate}
+                height={gridHeight}
+                todayString={todayString}
+                onDayPress={setSheetDate}
+              />
+            </Animated.View>
           )}
         </View>
       </View>
@@ -288,6 +360,13 @@ const makeStyles = (theme) => StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   gridWrap: {
+    flex: 1,
+    // The month sliding out must not draw over the month bar or the edges
+    overflow: 'hidden',
+  },
+  // Fills the grid area like MonthGrid did before it was wrapped: the grid is
+  // flex: 1, and inside an unsized wrapper it collapses to a single row.
+  slide: {
     flex: 1,
   },
 });

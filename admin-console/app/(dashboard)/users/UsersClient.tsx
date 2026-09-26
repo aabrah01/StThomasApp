@@ -7,6 +7,11 @@ export interface Device {
   appVersion: string | null;
   updateId: string | null;
   updateCreatedAt: string | null;
+  // true: running the JS built into the store binary; false: an OTA on top of
+  // it; null: the app is older than 1.2.1 and doesn't say. Needed because
+  // updateId/updateCreatedAt are reported for the built-in bundle too, dated to
+  // when the binary was built — so they alone read as an OTA that never was.
+  isEmbeddedLaunch: boolean | null;
   platform: string | null;
   osVersion: string | null;
   lastSeenAt: string;
@@ -55,6 +60,7 @@ const platformLabel = (d: Device) =>
 export default function UsersClient({ users: initial }: { users: UserRow[] }) {
   const [users, setUsers] = useState(initial);
   const [versionFilter, setVersionFilter] = useState('');
+  const [nameFilter, setNameFilter] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showOrphansOnly, setShowOrphansOnly] = useState(false);
 
@@ -70,42 +76,60 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
     return { versions: unique, latestVersion: unique[0] ?? null };
   }, [users]);
 
-  // Newest OTA bundle seen for each app version. OTA dates are only comparable
-  // within a version, since eas update publishes against the runtime version.
+  // Newest OTA bundle seen for each app version on each platform. OTA dates are
+  // only comparable within a version, since eas update publishes against the
+  // runtime version — and within a platform, since the iOS and Android store
+  // builds are made separately and their built-in bundles carry different
+  // dates. Compared across platforms, every iOS 1.2.0 device read as behind
+  // Android's build two minutes later. Devices known to be on the built-in
+  // bundle are left out: that date is a build, not an OTA anyone could get.
+  const otaKey = (d: Device) => `${d.appVersion}|${d.platform}`;
   const newestOtaByVersion = useMemo(() => {
     const m = new Map<string, number>();
     for (const u of users) {
       for (const d of u.devices) {
-        if (!d.appVersion || !d.updateCreatedAt) continue;
+        if (!d.appVersion || !d.updateCreatedAt || d.isEmbeddedLaunch) continue;
         const t = Date.parse(d.updateCreatedAt);
         if (!Number.isFinite(t)) continue;
-        const cur = m.get(d.appVersion);
-        if (cur === undefined || t > cur) m.set(d.appVersion, t);
+        const cur = m.get(otaKey(d));
+        if (cur === undefined || t > cur) m.set(otaKey(d), t);
       }
     }
     return m;
   }, [users]);
 
   // Two ways to be behind: an older binary, or the current binary running an OTA
-  // bundle older than the newest one seen for it (including no bundle at all).
+  // bundle older than the newest one seen for it on its platform (including the
+  // built-in bundle, or no bundle at all, once an OTA exists).
   const staleness = (d: Device): 'version' | 'update' | null => {
     if (!d.appVersion) return null;
     if (latestVersion && d.appVersion !== latestVersion) return 'version';
-    const newest = newestOtaByVersion.get(d.appVersion);
+    const newest = newestOtaByVersion.get(otaKey(d));
     if (newest === undefined) return null;
-    if (!d.updateCreatedAt) return 'update';
+    if (d.isEmbeddedLaunch || !d.updateCreatedAt) return 'update';
     return Date.parse(d.updateCreatedAt) < newest ? 'update' : null;
   };
 
+  // What the device is running on top of its binary
+  const bundleLabel = (d: Device) =>
+    d.isEmbeddedLaunch ? 'built-in'
+    : d.updateId ? `OTA ${otaLabel(d.updateCreatedAt) ?? '—'}`
+    : 'no OTA';
+
   const visible = useMemo(() => {
-    const base = showOrphansOnly ? users.filter(isOrphan) : users;
+    // Name or email, for "what is this person on?" — applied with the others
+    const q = nameFilter.trim().toLowerCase();
+    const orphans = showOrphansOnly ? users.filter(isOrphan) : users;
+    const base = q
+      ? orphans.filter(u => u.email.toLowerCase().includes(q) || u.memberName?.toLowerCase().includes(q))
+      : orphans;
     if (!versionFilter) return base;
     if (versionFilter === NEVER_OPENED) return base.filter(u => u.devices.length === 0);
     if (versionFilter === BEHIND) {
       return base.filter(u => u.devices.some(d => staleness(d) !== null));
     }
     return base.filter(u => u.devices.some(d => d.appVersion === versionFilter));
-  }, [users, versionFilter, showOrphansOnly, latestVersion, newestOtaByVersion]);
+  }, [users, versionFilter, nameFilter, showOrphansOnly, latestVersion, newestOtaByVersion]);
   const [createEmail, setCreateEmail] = useState('');
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState('');
@@ -249,27 +273,40 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
         </div>
       )}
 
-      {/* App version filter — answers "who is still on the old build?" */}
-      {(versions.length > 0 || users.some(u => u.devices.length === 0)) && (
-        <div className="flex items-center gap-3">
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">App Version</label>
-          <select
-            value={versionFilter}
-            onChange={e => setVersionFilter(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 h-[34px] text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#7E282F]"
-          >
-            <option value="">All versions</option>
-            {versions.map(v => <option key={v} value={v}>{v}</option>)}
-            <option value={BEHIND}>Behind (old version or update)</option>
-            <option value={NEVER_OPENED}>Never opened</option>
-          </select>
-          {versionFilter && (
-            <span className="text-sm text-gray-500">
-              {visible.length} of {users.length}
-            </span>
-          )}
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Name filter — answers "what version is this person on?" */}
+        <input
+          type="search"
+          value={nameFilter}
+          onChange={e => setNameFilter(e.target.value)}
+          placeholder="Search by name or email…"
+          aria-label="Search users by name or email"
+          className="border border-gray-200 rounded-lg px-3 h-[34px] text-sm bg-white w-full sm:w-64 focus:outline-none focus:ring-1 focus:ring-[#7E282F]"
+        />
+
+        {/* App version filter — answers "who is still on the old build?" */}
+        {(versions.length > 0 || users.some(u => u.devices.length === 0)) && (
+          <>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">App Version</label>
+            <select
+              value={versionFilter}
+              onChange={e => setVersionFilter(e.target.value)}
+              className="border border-gray-200 rounded-lg px-3 h-[34px] text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#7E282F]"
+            >
+              <option value="">All versions</option>
+              {versions.map(v => <option key={v} value={v}>{v}</option>)}
+              <option value={BEHIND}>Behind (old version or update)</option>
+              <option value={NEVER_OPENED}>Never opened</option>
+            </select>
+          </>
+        )}
+
+        {(versionFilter || nameFilter.trim()) && (
+          <span className="text-sm text-gray-500">
+            {visible.length} of {users.length}
+          </span>
+        )}
+      </div>
 
       {actionMsg && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">{actionMsg}</div>
@@ -394,9 +431,7 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
                           </span>
                           <span className="text-gray-400">
                             {' · '}
-                            {u.devices[0].updateId
-                              ? `OTA ${otaLabel(u.devices[0].updateCreatedAt) ?? '—'}`
-                              : 'no OTA'}
+                            {bundleLabel(u.devices[0])}
                           </span>
                           {staleness(u.devices[0]) === 'version' && (
                             <span className="ml-1.5 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-xs">outdated</span>
@@ -436,7 +471,9 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
                               <td className="pr-6 py-1 text-gray-900">{d.appVersion ?? '?'}</td>
                               <td className="pr-6 py-1">{platformLabel(d)}</td>
                               <td className="pr-6 py-1" title={d.updateId ?? undefined}>
-                                {d.updateId
+                                {d.isEmbeddedLaunch
+                                  ? <span className="text-gray-400">built-in</span>
+                                  : d.updateId
                                   ? <>
                                       OTA <span className="font-mono">{d.updateId.slice(0, 8)}</span>
                                       {d.updateCreatedAt && ` · ${new Date(d.updateCreatedAt).toLocaleDateString()}`}
