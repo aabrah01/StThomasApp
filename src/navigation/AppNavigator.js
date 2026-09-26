@@ -54,7 +54,9 @@ const AppStack = () => {
 
       {/* Menu destinations */}
       <Stack.Screen name="Directory" component={DirectoryListScreen} />
-      <Stack.Screen name="Events" component={CalendarScreen} />
+      {/* Swiping left/right turns the month here, so swipe-back is kept to the
+          very edge — the default 50pt would swallow swipes started on Sunday. */}
+      <Stack.Screen name="Events" component={CalendarScreen} options={{ gestureResponseDistance: 20 }} />
       <Stack.Screen name="Giving" component={GivingScreen} />
       <Stack.Screen name="Signups" component={SignupsScreen} />
       <Stack.Screen name="Media" component={MediaScreen} />

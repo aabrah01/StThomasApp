@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../context/AuthContext';
 import databaseService from '../../services/databaseService';
+import AdminPledgeSheet from './AdminPledgeSheet';
 
 
 // Append T00:00:00 so the string parses as local time, not UTC midnight.
@@ -44,6 +45,8 @@ const FoodDonationCard = React.memo(({ eventDate, eventId, startDate, onSignupCh
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
+  // Admin sheet: null when closed, { signup } to change one, { signup: null } to add
+  const [adminSheet, setAdminSheet] = useState(null);
 
   const load = useCallback(async () => {
     setError('');
@@ -76,8 +79,10 @@ const FoodDonationCard = React.memo(({ eventDate, eventId, startDate, onSignupCh
   const isPast = isServicePast(eventDate, startDate);
 
   const ownSignup = signups.find(s => s.memberId === member?.id);
+  // Members only: a well-wisher's row has no family, and an office account with
+  // no member record has none either — undefined === undefined would match them.
   const familySignups = signups.filter(
-    s => s.memberId !== member?.id && s.member?.familyId === member?.familyId
+    s => s.member && member && s.memberId !== member.id && s.member.familyId === member.familyId
   );
   // Covering the service alone is only on offer while nobody has pledged: once
   // someone is in, taking the whole thing over would contradict them. The count
@@ -142,12 +147,10 @@ const FoodDonationCard = React.memo(({ eventDate, eventId, startDate, onSignupCh
   const handleChurchProvide = async () => {
     setActionLoading(true);
     const { error: err } = await databaseService.setServiceProvision('meal', eventId, eventDate);
-    if (err) {
-      setError(err);
-    } else {
-      await load();
-      onSignupChange?.(eventDate);
-    }
+    // Refused if someone pledged in the meantime — say so, and show them
+    if (err) Alert.alert('Could Not Mark Service', err);
+    await load();
+    if (!err) onSignupChange?.(eventDate);
     setActionLoading(false);
   };
 
@@ -188,6 +191,32 @@ const FoodDonationCard = React.memo(({ eventDate, eventId, startDate, onSignupCh
       ]
     );
   };
+
+  // Admin changes to other members' pledges. A refusal is shown as an alert
+  // rather than in the card's error slot, which would replace the whole roster
+  // the admin is working from.
+  const runAdminChange = async (change) => {
+    setAdminSheet(null);
+    setActionLoading(true);
+    const { error: err } = await change();
+    if (err) Alert.alert('Could Not Update Pledge', err);
+    await load();
+    if (!err) onSignupChange?.(eventDate);
+    setActionLoading(false);
+  };
+
+  // A member picked from the list, or { donorName } for a well-wisher
+  const handleAdminAdd = (m, pledgeType) => runAdminChange(() =>
+    databaseService.adminAddSignup('meal', { memberId: m.id, donorName: m.donorName },
+      eventDate, eventId, pledgeType));
+  const handleAdminChangeType = (s, pledgeType) => runAdminChange(() =>
+    databaseService.adminUpdateSignup('meal', s.id, { pledgeType }));
+  const handleAdminMove = (s, m) => runAdminChange(() =>
+    databaseService.adminUpdateSignup('meal', s.id, { memberId: m.id }));
+  const handleAdminRename = (s, donorName) => runAdminChange(() =>
+    databaseService.adminUpdateSignup('meal', s.id, { donorName }));
+  const handleAdminRemove = (s) => runAdminChange(() =>
+    databaseService.adminDeleteSignup('meal', s.id));
 
   const adminMode = isAdmin();
 
@@ -241,21 +270,39 @@ const FoodDonationCard = React.memo(({ eventDate, eventId, startDate, onSignupCh
                 </Text>
               ))}
 
+              {/* Each row opens that pledge's actions. Past services included:
+                  admins correct the record after the fact. */}
               {adminMode && signups.length > 0 && (
                 <View style={styles.adminList}>
                   {signups.map(s => (
-                    <Text key={s.id} style={styles.adminName}>
-                      {s.member?.firstName} {s.member?.lastName}
-                      {s.member?.membershipId ? (
-                        <Text style={styles.adminMembershipId}>{` [${s.member.membershipId}]`}</Text>
-                      ) : null}
-                      {/* Pledges made before members were asked carry no type */}
-                      {s.pledgeType ? (
-                        <Text style={styles.adminPledgeType}>
-                          {s.pledgeType === 'full' ? ' · donating it' : ' · sharing'}
-                        </Text>
-                      ) : null}
-                    </Text>
+                    <TouchableOpacity
+                      key={s.id}
+                      style={styles.adminRow}
+                      onPress={() => setAdminSheet({ signup: s })}
+                      disabled={actionLoading}
+                      activeOpacity={0.6}
+                      accessibilityRole="button"
+                      accessibilityHint="Change, move or remove this pledge"
+                    >
+                      <Text style={styles.adminName}>
+                        {/* No member row when they've since been made inactive: hidden
+                            from app clients, admins included */}
+                        {s.donorName ?? (s.member ? `${s.member.firstName} ${s.member.lastName}` : 'Member')}
+                        {s.donorName ? (
+                          <Text style={styles.adminMembershipId}> · well-wisher</Text>
+                        ) : null}
+                        {s.member?.membershipId ? (
+                          <Text style={styles.adminMembershipId}>{` [${s.member.membershipId}]`}</Text>
+                        ) : null}
+                        {/* Pledges made before members were asked carry no type */}
+                        {s.pledgeType ? (
+                          <Text style={styles.adminPledgeType}>
+                            {s.pledgeType === 'full' ? ' · donating it' : ' · sharing'}
+                          </Text>
+                        ) : null}
+                      </Text>
+                      <Ionicons name="ellipsis-horizontal" size={18} color={theme.colors.textLight} />
+                    </TouchableOpacity>
                   ))}
                 </View>
               )}
@@ -310,9 +357,25 @@ const FoodDonationCard = React.memo(({ eventDate, eventId, startDate, onSignupCh
                 </TouchableOpacity>
               ) : null}
 
+              {/* Role alone, like the button below — the pledge is the member's,
+                  so an office account with no member record can add it too. */}
+              {adminMode && !churchProvided && !fullPledged ? (
+                <TouchableOpacity
+                  style={styles.churchButton}
+                  onPress={() => setAdminSheet({ signup: null })}
+                  disabled={actionLoading}
+                  activeOpacity={0.75}
+                >
+                  <Text style={styles.churchButtonText}>Add pledge for a member</Text>
+                </TouchableOpacity>
+              ) : null}
+
               {/* Role alone — service_provisions rows belong to no member, so this
-                  is the one action an office account can carry out here. */}
-              {adminMode && !isPast ? (
+                  is the one action an office account can carry out here. Offered
+                  only while nobody has pledged: the church takes a service over
+                  after its pledges are removed, never on top of them (the database
+                  refuses it too). Undoing it is always on offer. */}
+              {adminMode && !isPast && (churchProvided || count === 0) ? (
                 <TouchableOpacity
                   style={styles.churchButton}
                   onPress={churchProvided ? handleChurchCancel : handleChurchProvide}
@@ -332,6 +395,21 @@ const FoodDonationCard = React.memo(({ eventDate, eventId, startDate, onSignupCh
           )}
         </View>
       )}
+
+      {adminMode ? (
+        <AdminPledgeSheet
+          visible={adminSheet !== null}
+          thing="Food"
+          signup={adminSheet?.signup ?? null}
+          signups={signups}
+          onClose={() => setAdminSheet(null)}
+          onAdd={handleAdminAdd}
+          onChangeType={handleAdminChangeType}
+          onMove={handleAdminMove}
+          onRename={handleAdminRename}
+          onRemove={handleAdminRemove}
+        />
+      ) : null}
     </View>
   );
 });
@@ -426,7 +504,14 @@ const makeStyles = (theme) => StyleSheet.create({
     borderTopColor: theme.colors.border,
     gap: 6,
   },
+  adminRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+  },
   adminName: {
+    flex: 1,
     fontSize: theme.fonts.sizes.lg,
     color: theme.colors.text,
     fontWeight: '600',

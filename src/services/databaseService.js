@@ -8,7 +8,7 @@
 import { supabase } from '../../supabase.config';
 import { isDemoSession } from '../utils/config';
 import { logClientError } from './errorLogger';
-import { buildInfo, getDeviceId } from '../utils/buildInfo';
+import { buildInfo, getDeviceId, isEmbeddedLaunch } from '../utils/buildInfo';
 import {
   demoFamilies,
   demoMembers,
@@ -40,10 +40,12 @@ const demoServiceProvisions = [];
  * it checks the member is linked to the caller) and the service name from Google
  * Calendar — so no text from the app reaches the email.
  */
-const notifySignup = async (kind, action, memberId, eventDate, eventId) => {
+// `extra` carries what only admin changes need: previousMemberId for a pledge
+// moved between members, or signupId for a well-wisher, who has no member id.
+const notifySignup = async (kind, action, memberId, eventDate, eventId, extra = {}) => {
   try {
     const { error } = await supabase.functions.invoke('notify-signup', {
-      body: { kind, action, memberId, eventDate, eventId },
+      body: { kind, action, memberId, eventDate, eventId, ...extra },
     });
     if (error) {
       console.warn('[signup notify] not sent:', error.message);
@@ -303,6 +305,9 @@ class DatabaseService {
         p_update_created_at: info.update_created_at,
         p_platform: info.platform,
         p_os_version: info.os_version,
+        // Needs 20260926010000_client_installs_embedded_launch on the database;
+        // without it the whole launch report is refused.
+        p_is_embedded_launch: isEmbeddedLaunch(),
       });
 
       if (error) console.warn('[app launch] not recorded:', error.message);
@@ -413,6 +418,7 @@ class DatabaseService {
           return {
             id: s.id,
             memberId: s.memberId,
+            donorName: s.donorName ?? null,
             pledgeType: s.pledgeType,
             createdAt: s.createdAt,
             member: m ? { firstName: m.firstName, lastName: m.lastName, familyId: m.familyId } : null,
@@ -422,13 +428,14 @@ class DatabaseService {
     }
     const { data, error } = await supabase
       .from('meal_signups')
-      .select('id, member_id, pledge_type, created_at, member:members(first_name, last_name, family_id, family:families(membership_id))')
+      .select('id, member_id, donor_name, pledge_type, created_at, member:members(first_name, last_name, family_id, family:families(membership_id))')
       .eq('event_id', eventId);
     if (error) return { data: null, error: error.message };
     return {
       data: (data ?? []).map(row => ({
         id: row.id,
         memberId: row.member_id,
+        donorName: row.donor_name ?? null,
         pledgeType: row.pledge_type,
         createdAt: row.created_at,
         member: row.member
@@ -549,6 +556,7 @@ class DatabaseService {
           return {
             id: s.id,
             memberId: s.memberId,
+            donorName: s.donorName ?? null,
             pledgeType: s.pledgeType,
             createdAt: s.createdAt,
             member: m ? { firstName: m.firstName, lastName: m.lastName, familyId: m.familyId } : null,
@@ -558,13 +566,14 @@ class DatabaseService {
     }
     const { data, error } = await supabase
       .from('flower_signups')
-      .select('id, member_id, pledge_type, created_at, member:members(first_name, last_name, family_id, family:families(membership_id))')
+      .select('id, member_id, donor_name, pledge_type, created_at, member:members(first_name, last_name, family_id, family:families(membership_id))')
       .eq('event_id', eventId);
     if (error) return { data: null, error: error.message };
     return {
       data: (data ?? []).map(row => ({
         id: row.id,
         memberId: row.member_id,
+        donorName: row.donor_name ?? null,
         pledgeType: row.pledge_type,
         createdAt: row.created_at,
         member: row.member
@@ -663,6 +672,129 @@ class DatabaseService {
     const { data, error } = await supabase.rpc('flower_full_pledge_for_event', { p_event_id: eventId });
     if (error) return { data: false, error: error.message };
     return { data: Boolean(data), error: null };
+  }
+
+  // ── Admin: managing other members' pledges ──────────────────────────────────
+  // Through admin_*_signup (20260926000000_admin_manage_signups.sql), which check
+  // the caller is an admin, apply the full-pledge rule and write the audit entry.
+  // Their errors are written for the admin, so they are passed through as-is.
+  // `kind` is 'meal' or 'flower'.
+
+  // Every active member, for picking who a pledge is for.
+  async getMembersForPicker() {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return {
+        data: demoMembers
+          .filter(m => m.isActive)
+          .map(m => {
+            const f = demoFamilies.find(df => df.id === m.familyId);
+            return {
+              id: m.id,
+              firstName: m.firstName,
+              lastName: m.lastName,
+              alias: m.alias ?? null,
+              familyName: f?.familyName ?? null,
+              membershipId: f?.membershipId ?? null,
+            };
+          })
+          .sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)),
+        error: null,
+      };
+    }
+    const { data, error } = await supabase
+      .from('members')
+      .select('id, first_name, last_name, alias, family:families(family_name, membership_id)')
+      .eq('is_active', true)
+      .order('first_name', { ascending: true })
+      .order('last_name', { ascending: true });
+    if (error) return { data: null, error: error.message };
+    return {
+      data: (data ?? []).map(row => ({
+        id: row.id,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        alias: row.alias ?? null,
+        familyName: row.family?.family_name ?? null,
+        membershipId: row.family?.membership_id ?? null,
+      })),
+      error: null,
+    };
+  }
+
+  // For a member (memberId) or a well-wisher entered by name (donorName) — one
+  // or the other.
+  async adminAddSignup(kind, { memberId = null, donorName = null }, eventDate, eventId, pledgeType) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const store = kind === 'meal' ? demoMealSignups : demoFlowerSignups;
+      if (memberId && store.some(s => s.memberId === memberId && s.eventId === eventId)) {
+        return { error: 'This member has already pledged for this service.' };
+      }
+      store.push({
+        id: `demo-signup-${Date.now()}`, memberId, donorName: donorName?.trim() || null,
+        eventDate, eventId, pledgeType, createdAt: new Date().toISOString(),
+      });
+      return { error: null };
+    }
+    const { data, error } = await supabase.rpc('admin_add_signup', {
+      p_kind: kind,
+      p_member_id: memberId,
+      p_donor_name: donorName,
+      p_event_date: eventDate,
+      p_event_id: eventId,
+      p_pledge_type: pledgeType,
+    });
+    if (error) return { error: error.message };
+    notifySignup(kind, 'created', data.memberId, eventDate, eventId,
+      data.donorName ? { signupId: data.id } : {});
+    return { error: null };
+  }
+
+  // Any of pledgeType, memberId (a member's pledge) or donorName (a
+  // well-wisher's); leave one out to keep it.
+  async adminUpdateSignup(kind, signupId, { pledgeType = null, memberId = null, donorName = null }) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const store = kind === 'meal' ? demoMealSignups : demoFlowerSignups;
+      const signup = store.find(s => s.id === signupId);
+      if (!signup) return { error: 'That pledge no longer exists.' };
+      if (pledgeType) signup.pledgeType = pledgeType;
+      if (memberId) signup.memberId = memberId;
+      if (donorName?.trim()) signup.donorName = donorName.trim();
+      return { error: null };
+    }
+    const { data, error } = await supabase.rpc('admin_update_signup', {
+      p_kind: kind,
+      p_id: signupId,
+      p_pledge_type: pledgeType,
+      p_member_id: memberId,
+      p_donor_name: donorName,
+    });
+    if (error) return { error: error.message };
+    if (data?.changed) {
+      const moved = !data.donorName && data.memberId !== data.previousMemberId;
+      notifySignup(kind, moved ? 'moved' : 'updated', data.memberId, data.eventDate, data.eventId,
+        data.donorName ? { signupId: data.id }
+        : moved ? { previousMemberId: data.previousMemberId }
+        : {});
+    }
+    return { error: null };
+  }
+
+  async adminDeleteSignup(kind, signupId) {
+    if (isDemoSession()) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const store = kind === 'meal' ? demoMealSignups : demoFlowerSignups;
+      const idx = store.findIndex(s => s.id === signupId);
+      if (idx !== -1) store.splice(idx, 1);
+      return { error: null };
+    }
+    const { data, error } = await supabase.rpc('admin_delete_signup', { p_kind: kind, p_id: signupId });
+    if (error) return { error: error.message };
+    notifySignup(kind, 'cancelled', data.memberId, data.eventDate, data.eventId,
+      data.donorName ? { signupId: data.id } : {});
+    return { error: null };
   }
 
   // ── Church-provided services ────────────────────────────────────────────────

@@ -28,8 +28,10 @@
  *   SIGNUP_NOTIFY_FROM             — overrides the From address
  *
  * POST body: { kind: 'meal' | 'flower',
- *              action: 'created' | 'cancelled',
- *              memberId: uuid,
+ *              action: 'created' | 'cancelled' | 'updated' | 'moved',
+ *              memberId: uuid,            // a member's pledge
+ *              signupId?: uuid,           // instead of memberId: a well-wisher's
+ *              previousMemberId?: uuid,   // required for 'moved'
  *              eventDate: 'YYYY-MM-DD',
  *              eventId: string }
  *
@@ -38,6 +40,22 @@
  * caller's own account, and the service name is fetched from Google Calendar by
  * id — so a member cannot put text of their choosing in front of the secretary,
  * only trigger a mail about their own real sign-up.
+ *
+ * Admins may also report on any member's pledge, since they can add, change,
+ * move and remove pledges for others (admin_*_signup in
+ * 20260926000000_admin_manage_signups.sql). 'updated' (sharing ↔ covering it
+ * alone) and 'moved' (to another member) only ever come from an admin. Those
+ * emails say "Changed by <admin>", with the admin's name read from their member
+ * record, their Google profile, or failing both their login email — again never
+ * from the request. The admin console forwards the signed-in admin's own access
+ * token, so it is identified here exactly as the app is.
+ *
+ * Well-wishers — donors outside the membership, entered by name by an admin —
+ * are identified by `signupId`, the pledge row, since they have no member id.
+ * Their name is read from that row, or for a removed pledge from the audit
+ * entry admin_delete_signup wrote for it (the row is gone by then); so a
+ * well-wisher's name reaches the email the same way a member's does, from the
+ * database. Only admins can report on a well-wisher's pledge.
  *
  * `memberId` is supplied rather than derived because a login can be linked to
  * more than one member: members each have their own address, but any that do
@@ -52,8 +70,10 @@
  *   200 { sent: 0, reason: string }  — nothing to send; see reason
  *   400 { error: 'invalid_body' }    — malformed/unknown fields
  *   401 { error: 'unauthorized' }    — missing or invalid JWT
- *   403 { error: 'not_your_member' } — memberId is not linked to the caller
- *   409 { error: 'state_mismatch' }  — the sign-up row doesn't match `action`
+ *   403 { error: 'not_your_member' } — memberId is not linked to the caller,
+ *                                      and the caller is not an admin (or the
+ *                                      action is admin-only)
+ *   409 { error: 'state_mismatch' }  — the sign-up rows don't match `action`
  *   500 { error: string }            — unexpected server error
  */
 
@@ -157,50 +177,110 @@ Deno.serve(async (req: Request) => {
     if (userError || !userData?.user) return json({ error: 'unauthorized' }, 401);
 
     // ── Parse & validate the body ─────────────────────────────────────────────
-    let kind: string, action: string, memberId: string, eventDate: string, eventId: string;
+    let kind: string, action: string, memberId: string, signupId: string,
+        previousMemberId: string, eventDate: string, eventId: string;
     try {
       const body = await req.json();
-      kind      = String(body?.kind ?? '');
-      action    = String(body?.action ?? '');
-      memberId  = String(body?.memberId ?? '');
-      eventDate = String(body?.eventDate ?? '');
-      eventId   = String(body?.eventId ?? '');
+      kind             = String(body?.kind ?? '');
+      action           = String(body?.action ?? '');
+      memberId         = String(body?.memberId ?? '');
+      signupId         = String(body?.signupId ?? '');
+      previousMemberId = String(body?.previousMemberId ?? '');
+      eventDate        = String(body?.eventDate ?? '');
+      eventId          = String(body?.eventId ?? '');
     } catch {
       return json({ error: 'invalid_body' }, 400);
     }
 
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const wellWisher = signupId !== '';
     if (!(kind in KINDS)) return json({ error: 'invalid_body' }, 400);
-    if (action !== 'created' && action !== 'cancelled') return json({ error: 'invalid_body' }, 400);
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(memberId)) {
+    if (!['created', 'cancelled', 'updated', 'moved'].includes(action)) {
+      return json({ error: 'invalid_body' }, 400);
+    }
+    if (wellWisher) {
+      // A well-wisher's pledge never moves; it is removed and re-added instead.
+      if (!UUID.test(signupId) || action === 'moved') return json({ error: 'invalid_body' }, 400);
+    } else if (!UUID.test(memberId)) {
+      return json({ error: 'invalid_body' }, 400);
+    }
+    if (action === 'moved' && (!UUID.test(previousMemberId) || previousMemberId === memberId)) {
       return json({ error: 'invalid_body' }, 400);
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) return json({ error: 'invalid_body' }, 400);
     if (!eventId || eventId.length > 1024) return json({ error: 'invalid_body' }, 400);
 
     const { table, thing, pledge, notifyColumn } = KINDS[kind as Kind];
+    const callerId = userData.user.id;
 
-    // ── Check the member belongs to the caller, and get their name ────────────
-    const { data: link, error: linkError } = await adminClient
-      .from('member_users')
-      .select('member:members(first_name, last_name, family:families(membership_id))')
-      .eq('user_id', userData.user.id)
-      .eq('member_id', memberId)
-      .maybeSingle();
+    // ── Is the caller reporting on their own member, or acting as an admin? ────
+    const [{ data: link, error: linkError }, { data: role, error: roleError }] = await Promise.all([
+      wellWisher
+        ? Promise.resolve({ data: null, error: null })
+        : adminClient.from('member_users').select('member_id')
+            .eq('user_id', callerId).eq('member_id', memberId).maybeSingle(),
+      adminClient.from('user_roles').select('role')
+        .eq('user_id', callerId).eq('role', 'admin').maybeSingle(),
+    ]);
 
-    if (linkError) {
-      console.error('member lookup error:', linkError.message);
+    if (linkError || roleError) {
+      console.error('caller lookup error:', (linkError ?? roleError)!.message);
       return json({ error: 'server_error' }, 500);
     }
-    if (!link) return json({ error: 'not_your_member' }, 403);
 
-    const member = link.member as unknown as {
+    // Only an admin can change or move a pledge, or enter a well-wisher's, so
+    // only an admin can report on one.
+    const adminOnly = action === 'updated' || action === 'moved' || wellWisher;
+    if ((adminOnly || !link) && !role) return json({ error: 'not_your_member' }, 403);
+    const byAdmin = adminOnly || !link;
+
+    // ── Names, from the members table ─────────────────────────────────────────
+    type MemberRow = {
+      id: string;
       first_name: string;
       last_name: string;
       family: { membership_id: string | null } | null;
-    } | null;
+    };
 
-    const memberName = [member?.first_name, member?.last_name].filter(Boolean).join(' ') || 'A member';
-    const membershipId = member?.family?.membership_id ?? null;
+    // A well-wisher has no member row; their name comes off the pledge below.
+    const { data: named, error: namedError } = wellWisher
+      ? { data: [], error: null }
+      : await adminClient
+          .from('members')
+          .select('id, first_name, last_name, family:families(membership_id)')
+          .in('id', action === 'moved' ? [memberId, previousMemberId] : [memberId]);
+
+    if (namedError) {
+      console.error('member lookup error:', namedError.message);
+      return json({ error: 'server_error' }, 500);
+    }
+
+    const labelFor = (id: string) => {
+      const m = (named as unknown as MemberRow[] | null)?.find(r => r.id === id);
+      const name = [m?.first_name, m?.last_name].filter(Boolean).join(' ') || 'A member';
+      return { name, who: m?.family?.membership_id ? `${name} [${m.family.membership_id}]` : name };
+    };
+
+    let { name: memberName, who } = labelFor(memberId);
+    const previous = action === 'moved' ? labelFor(previousMemberId) : null;
+
+    // The admin's own name for the byline. Office accounts have no member record
+    // and may have no Google profile either, so the login email is the fallback.
+    let adminName = '';
+    if (byAdmin) {
+      const { data: adminLink } = await adminClient
+        .from('member_users')
+        .select('member:members(first_name, last_name)')
+        .eq('user_id', callerId)
+        .limit(1)
+        .maybeSingle();
+      const m = adminLink?.member as unknown as { first_name: string; last_name: string } | null;
+      const meta = userData.user.user_metadata ?? {};
+      adminName = [m?.first_name, m?.last_name].filter(Boolean).join(' ')
+        || String(meta.full_name ?? meta.name ?? '')
+        || userData.user.email
+        || 'an admin';
+    }
 
     // ── Who is pledged for this service, in the order they signed up ──────────
     // Fetched in full rather than counted: the email carries the whole roster,
@@ -208,7 +288,7 @@ Deno.serve(async (req: Request) => {
     // current list together from a chain of them. It doubles as the state check.
     const { data: rows, error: rowsError } = await adminClient
       .from(table)
-      .select('member_id, pledge_type, member:members(first_name, last_name, family:families(membership_id))')
+      .select('id, member_id, donor_name, pledge_type, member:members(first_name, last_name, family:families(membership_id))')
       .eq('event_id', eventId)
       .order('created_at', { ascending: true });
 
@@ -218,9 +298,47 @@ Deno.serve(async (req: Request) => {
     }
 
     // A forged call can't mail the secretary about a pledge that was never made,
-    // or a cancellation that never happened.
-    const exists = (rows ?? []).some(r => r.member_id === memberId);
-    if ((action === 'created') !== exists) return json({ error: 'state_mismatch' }, 409);
+    // or a cancellation that never happened. A pledge that is still there after
+    // a change, or has moved off one member and onto another, is checked the
+    // same way.
+    const own = (rows ?? []).find(r =>
+      wellWisher ? r.id === signupId && r.donor_name : r.member_id === memberId);
+    const exists = !!own;
+    const previousGone = !(rows ?? []).some(r => r.member_id === previousMemberId);
+    const consistent =
+      action === 'cancelled' ? !exists
+      : action === 'moved' ? exists && previousGone
+      : exists;
+    if (!consistent) return json({ error: 'state_mismatch' }, 409);
+
+    // A well-wisher's name: off the row while it exists, otherwise from the
+    // audit entry written when it was removed — which must be for this service,
+    // so a removal elsewhere cannot be passed off as one here.
+    if (wellWisher) {
+      let donorName: string | null = own?.donor_name ?? null;
+      if (action === 'cancelled') {
+        const { data: removed, error: auditError } = await adminClient
+          .from('audit_log')
+          .select('details')
+          .eq('table_name', table)
+          .eq('record_id', signupId)
+          .eq('action', 'delete')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (auditError) {
+          console.error('audit lookup error:', auditError.message);
+          return json({ error: 'server_error' }, 500);
+        }
+        const details = removed?.details as { donorName?: string; eventId?: string } | null;
+        if (!details?.donorName || details.eventId !== eventId) {
+          return json({ error: 'state_mismatch' }, 409);
+        }
+        donorName = details.donorName;
+      }
+      memberName = donorName ?? 'A well-wisher';
+      who = `${memberName} (well-wisher)`;
+    }
 
     // 'full' — covering the service alone, which closes it to other sign-ups.
     // 'shared' — splitting it with whoever else pledges. Rows made before the
@@ -237,7 +355,9 @@ Deno.serve(async (req: Request) => {
         family: { membership_id: string | null } | null;
       } | null;
       const name = [m?.first_name, m?.last_name].filter(Boolean).join(' ') || 'Unknown member';
-      const label = m?.family?.membership_id ? `${name} [${m.family.membership_id}]` : name;
+      const label = row.donor_name ? `${row.donor_name} (well-wisher)`
+        : m?.family?.membership_id ? `${name} [${m.family.membership_id}]`
+        : name;
       return `${label}${pledgeNote(row.pledge_type ?? null)}`;
     });
 
@@ -268,21 +388,31 @@ Deno.serve(async (req: Request) => {
     // ── Compose ───────────────────────────────────────────────────────────────
     const eventLabel = await fetchEventLabel(eventId);
     const when = formatDate(eventDate);
-    const who = membershipId ? `${memberName} [${membershipId}]` : memberName;
     const prefix = Deno.env.get('SIGNUP_NOTIFY_PRODUCTION') === 'true' ? '' : '[DEV] ';
 
-    const subject = action === 'created'
-      ? `${prefix}${thing} sign-up — ${memberName}, ${when}`
-      : `${prefix}${thing} sign-up CANCELLED — ${memberName}, ${when}`;
+    const subject = `${prefix}${thing} sign-up${
+      action === 'cancelled' ? ' CANCELLED'
+      : action === 'updated' ? ' CHANGED'
+      : action === 'moved' ? ' MOVED'
+      : ''
+    } — ${action === 'moved' ? `${previous!.name} → ${memberName}` : memberName}, ${when}`;
 
     // Read off the row rather than taken from the request: nothing the caller
     // sends reaches the email. A cancellation has no row left to read, so it
     // says only that the pledge is gone.
-    const ownType = (rows ?? []).find(r => r.member_id === memberId)?.pledge_type ?? null;
+    const ownType = own?.pledge_type ?? null;
 
-    const headline = action === 'created'
-      ? `${who} has pledged to ${pledge}${pledgeNote(ownType)}.`
-      : `${who} has cancelled their pledge to ${pledge}.`;
+    // Worded for who did it: a member cancels "their" pledge; when an admin acts
+    // for a member, the sentence is about the member and the byline says who.
+    const headline =
+      action === 'created' && !byAdmin ? `${who} has pledged to ${pledge}${pledgeNote(ownType)}.`
+      : action === 'created' ? `${who} has been signed up to ${pledge}${pledgeNote(ownType)}.`
+      : action === 'cancelled' && !byAdmin ? `${who} has cancelled their pledge to ${pledge}.`
+      : action === 'cancelled' ? `${who}'s pledge to ${pledge} has been removed.`
+      : action === 'updated' ? `${who}'s pledge to ${pledge} has been changed${pledgeNote(ownType)}.`
+      : `${previous!.who}'s pledge to ${pledge} has been moved to ${who}${pledgeNote(ownType)}.`;
+
+    const byline = byAdmin ? `Changed by ${adminName}` : '';
 
     const detail = eventLabel ? `${when} — ${eventLabel}` : when;
 
@@ -292,6 +422,7 @@ Deno.serve(async (req: Request) => {
 
     const text = [
       headline,
+      ...(byline ? [byline] : []),
       '',
       detail,
       '',
@@ -303,6 +434,7 @@ Deno.serve(async (req: Request) => {
 
     const html = [
       `<p style="font-size:16px"><strong>${esc(headline)}</strong></p>`,
+      byline ? `<p style="color:#6b7280">${esc(byline)}</p>` : '',
       `<p>${esc(detail)}</p>`,
       action === 'cancelled'
         ? '<p style="color:#b91c1c">This pledge is no longer counted.</p>'

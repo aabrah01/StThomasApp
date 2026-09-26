@@ -23,6 +23,21 @@ import { useCommonStyles } from '../../styles/commonStyles';
 
 const CARD_MARGIN = 8;
 
+const byMembershipId = (a, b) =>
+  (a.membershipId || '').localeCompare(b.membershipId || '', undefined, { numeric: true });
+
+// By the surname the card shows — every family is named "<Surname> Family".
+// Not the head of household's last name: in about one family in five it
+// differs from the family name, which would file "Palakkadan Family" under V.
+const surname = (f) => (f.familyName || '').replace(/\s+family$/i, '');
+const byFamilyName = (a, b) =>
+  surname(a).localeCompare(surname(b), undefined, { sensitivity: 'base' }) || byMembershipId(a, b);
+
+const SORTS = [
+  { key: 'id', label: 'ID', compare: byMembershipId },
+  { key: 'name', label: 'A–Z', compare: byFamilyName },
+];
+
 const DirectoryListScreen = ({ navigation }) => {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -33,6 +48,7 @@ const DirectoryListScreen = ({ navigation }) => {
   const [families, setFamilies] = useState([]);
   const [filteredFamilies, setFilteredFamilies] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortKey, setSortKey] = useState('id');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -49,9 +65,14 @@ const DirectoryListScreen = ({ navigation }) => {
     if (refreshKey > 0) loadFamilies();
   }, [refreshKey]);
 
+  const sortedFamilies = useMemo(() => {
+    const { compare } = SORTS.find(s => s.key === sortKey);
+    return families.slice().sort(compare);
+  }, [families, sortKey]);
+
   useEffect(() => {
     filterFamilies();
-  }, [searchQuery, families]);
+  }, [searchQuery, sortedFamilies]);
 
   const loadFamilies = async () => {
     setError('');
@@ -59,10 +80,7 @@ const DirectoryListScreen = ({ navigation }) => {
     if (fetchError) {
       setError(fetchError);
     } else {
-      const sorted = (data || []).slice().sort((a, b) =>
-        (a.membershipId || '').localeCompare(b.membershipId || '', undefined, { numeric: true })
-      );
-      setFamilies(sorted);
+      setFamilies(data || []);
     }
     setLoading(false);
     setRefreshing(false);
@@ -88,12 +106,12 @@ const DirectoryListScreen = ({ navigation }) => {
     // stray trailing space doesn't kill the match
     const tokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
     if (tokens.length === 0) {
-      setFilteredFamilies(families);
+      setFilteredFamilies(sortedFamilies);
       return;
     }
 
     setFilteredFamilies(
-      families.filter((f) => {
+      sortedFamilies.filter((f) => {
         const haystack = haystackFor(f);
         const haystackDigits = haystack.replace(/\D/g, '');
         // Every token has to appear somewhere — narrowing, not widening
@@ -143,11 +161,31 @@ const DirectoryListScreen = ({ navigation }) => {
       <ErrorMessage message={error} style={styles.error} />
 
       {families.length > 0 && (
-        <Text style={styles.countLabel}>
-          {searchQuery.trim()
-            ? `${filteredFamilies.length} of ${families.length} families`
-            : `${families.length} families`}
-        </Text>
+        <View style={styles.countRow}>
+          <Text style={styles.countLabel}>
+            {searchQuery.trim()
+              ? `${filteredFamilies.length} of ${families.length} families`
+              : `${families.length} families`}
+          </Text>
+          <View style={styles.sortToggle} accessibilityRole="radiogroup" accessibilityLabel="Sort families">
+            {SORTS.map(s => {
+              const selected = s.key === sortKey;
+              return (
+                <TouchableOpacity
+                  key={s.key}
+                  style={[styles.sortOption, selected && styles.sortOptionSelected]}
+                  onPress={() => setSortKey(s.key)}
+                  activeOpacity={0.75}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={s.key === 'id' ? 'Sort by membership ID' : 'Sort alphabetically by family name'}
+                >
+                  <Text style={[styles.sortText, selected && styles.sortTextSelected]}>{s.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
       )}
 
       {filteredFamilies.length === 0 ? (
@@ -216,14 +254,42 @@ const makeStyles = (theme) => StyleSheet.create({
     marginHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.sm,
   },
+  countRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
   countLabel: {
     fontSize: theme.fonts.sizes.xs,
     color: theme.colors.textSecondary,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-    marginHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
+  },
+  sortToggle: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.round,
+    padding: 2,
+    ...theme.shadows.sm,
+  },
+  sortOption: {
+    paddingHorizontal: theme.spacing.sm + 4,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.round,
+  },
+  sortOptionSelected: {
+    backgroundColor: theme.colors.sapphire,
+  },
+  sortText: {
+    fontSize: theme.fonts.sizes.xs,
+    fontWeight: '700',
+    color: theme.colors.textSecondary,
+  },
+  sortTextSelected: {
+    color: '#FFFFFF',
   },
   emptyContainer: {
     flex: 1,

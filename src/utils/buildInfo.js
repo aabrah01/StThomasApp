@@ -33,6 +33,21 @@ export const buildInfo = () => {
 };
 
 /**
+ * Whether this launch is running the JS bundle built into the store binary,
+ * rather than an OTA bundle downloaded on top of it. updateId and createdAt
+ * can't tell: expo-updates reports both for the built-in bundle too, dated to
+ * when the binary was built.
+ *
+ * Kept out of buildInfo() on purpose. The error logger spreads buildInfo()
+ * straight into client_errors, which has no such column — adding the key there
+ * would make every error report fail. Only client_installs records this.
+ */
+export const isEmbeddedLaunch = () => {
+  const Updates = require('expo-updates');
+  return typeof Updates.isEmbeddedLaunch === 'boolean' ? Updates.isEmbeddedLaunch : null;
+};
+
+/**
  * Stable id for this device, so a member's phone and tablet are separate rows.
  *
  * Uses expo-application, which is already a dependency and therefore already in

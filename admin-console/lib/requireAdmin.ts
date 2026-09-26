@@ -4,7 +4,9 @@ import { NextResponse } from 'next/server';
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
-export type AdminContext = { userId: string };
+// accessToken is the admin's own session token, for calling Edge Functions that
+// identify their caller by it (notify-signup). Undefined in demo mode.
+export type AdminContext = { userId: string; accessToken?: string };
 
 /**
  * Call at the top of every API route handler.
@@ -42,7 +44,11 @@ export async function requireAdmin(): Promise<AdminContext | NextResponse> {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  return { userId: user.id };
+  // Read after getUser() has verified the session with Supabase Auth; the
+  // function it is passed to verifies it again before trusting it.
+  const { data: { session } } = await supabase.auth.getSession();
+
+  return { userId: user.id, accessToken: session?.access_token };
 }
 
 export function isError(result: AdminContext | NextResponse): result is NextResponse {
