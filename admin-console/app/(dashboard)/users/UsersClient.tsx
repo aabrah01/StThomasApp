@@ -52,6 +52,12 @@ const compareVersions = (a: string, b: string) => {
 // they left the roll. Admins legitimately have no member record.
 const isOrphan = (u: UserRow) => !u.memberId && u.role !== 'admin';
 
+// A device other than the latest that hasn't opened the app in this long is
+// taken as gone. Deleting and reinstalling the app resets its device id, so the
+// same phone comes back as a new device and its old row just stops updating.
+// Nothing ever removes that old row, so it is greyed out here instead.
+const INACTIVE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+
 const platformLabel = (d: Device) =>
   [d.platform === 'ios' ? 'iOS' : d.platform === 'android' ? 'Android' : d.platform, d.osVersion]
     .filter(Boolean)
@@ -64,13 +70,20 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showOrphansOnly, setShowOrphansOnly] = useState(false);
 
+  const [inactiveBefore] = useState(() => Date.now() - INACTIVE_AFTER_MS);
+  // devices[0] is the most recently used, so it is never inactive; it is what
+  // the user is on now.
+  const isInactive = (d: Device, i: number) => i > 0 && Date.parse(d.lastSeenAt) < inactiveBefore;
+  const activeCount = (u: UserRow) => u.devices.filter((d, i) => !isInactive(d, i)).length;
+
   const orphans = useMemo(() => users.filter(isOrphan), [users]);
 
   // "Stale" is measured against the highest version anyone has reported, so no
-  // release number has to be hardcoded here.
+  // release number has to be hardcoded here. The dropdown lists only versions
+  // someone is currently on, since the filter matches each user's latest device.
   const { versions, latestVersion } = useMemo(() => {
     const all = users
-      .flatMap(u => u.devices.map(d => d.appVersion))
+      .map(u => u.devices[0]?.appVersion)
       .filter((v): v is string => !!v);
     const unique = Array.from(new Set(all)).sort(compareVersions).reverse();
     return { versions: unique, latestVersion: unique[0] ?? null };
@@ -125,10 +138,12 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
       : orphans;
     if (!versionFilter) return base;
     if (versionFilter === NEVER_OPENED) return base.filter(u => u.devices.length === 0);
+    // Each user is classified by their latest device alone, so an abandoned
+    // phone doesn't also list them under the version it was left on.
     if (versionFilter === BEHIND) {
-      return base.filter(u => u.devices.some(d => staleness(d) !== null));
+      return base.filter(u => u.devices[0] && staleness(u.devices[0]) !== null);
     }
-    return base.filter(u => u.devices.some(d => d.appVersion === versionFilter));
+    return base.filter(u => u.devices[0]?.appVersion === versionFilter);
   }, [users, versionFilter, nameFilter, showOrphansOnly, latestVersion, newestOtaByVersion]);
   const [createEmail, setCreateEmail] = useState('');
   const [creating, setCreating] = useState(false);
@@ -338,7 +353,7 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
                       {latestVersion && u.devices[0].appVersion && u.devices[0].appVersion !== latestVersion && (
                         <span className="text-amber-600"> · outdated</span>
                       )}
-                      {u.devices.length > 1 && <span className="text-gray-400"> · {u.devices.length} devices</span>}
+                      {activeCount(u) > 1 && <span className="text-gray-400"> · {activeCount(u)} devices</span>}
                     </span>
                   )}
                 </div>
@@ -441,7 +456,7 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
                           )}
                           <span className="block text-gray-400 text-xs">
                             {platformLabel(u.devices[0])}
-                            {u.devices.length > 1 && ` · ${u.devices.length} devices`}
+                            {activeCount(u) > 1 && ` · ${activeCount(u)} devices`}
                           </span>
                         </>
                       )}
@@ -466,8 +481,8 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
                       ) : (
                       <table className="text-xs text-gray-600">
                         <tbody>
-                          {u.devices.map(d => (
-                            <tr key={d.deviceId}>
+                          {u.devices.map((d, i) => (
+                            <tr key={d.deviceId} className={isInactive(d, i) ? 'opacity-50' : undefined}>
                               <td className="pr-6 py-1 text-gray-900">{d.appVersion ?? '?'}</td>
                               <td className="pr-6 py-1">{platformLabel(d)}</td>
                               <td className="pr-6 py-1" title={d.updateId ?? undefined}>
@@ -480,7 +495,11 @@ export default function UsersClient({ users: initial }: { users: UserRow[] }) {
                                     </>
                                   : <span className="text-gray-400">no OTA</span>}
                               </td>
-                              <td className="py-1">last used {new Date(d.lastSeenAt).toLocaleString()}</td>
+                              <td className="py-1">
+                                {isInactive(d, i)
+                                  ? `not seen since ${new Date(d.lastSeenAt).toLocaleDateString()} · likely replaced or reinstalled`
+                                  : `last used ${new Date(d.lastSeenAt).toLocaleString()}`}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
