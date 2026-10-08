@@ -21,6 +21,8 @@ export const EventsProvider = ({ children }) => {
   // month-navigation merge doesn't look like a new base load.
   const loadedRangeRef = useRef({ min: null, max: null });
   const [baseRange, setBaseRange] = useState({ min: null, max: null });
+  // Months fetched on their own by ensureMonthLoaded, as "YYYY-M"
+  const loadedMonthsRef = useRef(new Set());
   // How far forward events are loaded — screens use this to decide whether
   // they need more than the base window
   const [loadedUntil, setLoadedUntil] = useState(null);
@@ -44,6 +46,7 @@ export const EventsProvider = ({ children }) => {
     } else if (data) {
       setEvents(data);
       loadedRangeRef.current = { min: timeMin, max: timeMax };
+      loadedMonthsRef.current = new Set(); // setEvents above dropped their events
       setBaseRange({ min: timeMin, max: timeMax });
       setLoadedUntil(timeMax);
     }
@@ -108,14 +111,18 @@ export const EventsProvider = ({ children }) => {
     setExtending(false);
   }, [mergeEvents, exhausted]);
 
-  // Fetch a month that falls outside the loaded window, merging into existing events
+  // Fetch a month that isn't fully inside the loaded window, merging into existing
+  // events. Tracked separately so the window stays contiguous — widening it to a
+  // far month would hide the gap in between (and extendForward would skip it).
   const ensureMonthLoaded = useCallback(async (year, month) => {
     const { min, max } = loadedRangeRef.current;
     if (!min || !max) return;
 
     const monthStart = new Date(year, month - 1, 1);
     const monthEnd = new Date(year, month, 0, 23, 59, 59);
-    if (monthEnd >= min && monthStart <= max) return; // already covered
+    if (monthStart >= min && monthEnd <= max) return; // fully covered
+    const key = `${year}-${month}`;
+    if (loadedMonthsRef.current.has(key)) return;
 
     setMonthLoading(true);
     const { data } = await calendarService.getEvents(
@@ -125,10 +132,7 @@ export const EventsProvider = ({ children }) => {
 
     if (data) {
       mergeEvents(data);
-      loadedRangeRef.current = {
-        min: monthStart < min ? monthStart : min,
-        max: monthEnd > max ? monthEnd : max,
-      };
+      loadedMonthsRef.current.add(key);
     }
     setMonthLoading(false);
   }, [mergeEvents]);
