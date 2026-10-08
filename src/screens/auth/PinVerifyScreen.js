@@ -48,24 +48,41 @@ const PinVerifyScreen = ({ navigation, route }) => {
     return () => clearInterval(interval);
   }, [resendCooldown]);
 
+  // A ref, not just `loading`: auto-submit and a button tap can land in the
+  // same frame, before the state update disables anything
+  const submittingRef = useRef(false);
+
+  // The sign-in can still be refused after the code is accepted (no member
+  // record) — unlock the screen so the message isn't stuck behind "Verifying..."
+  useEffect(() => {
+    if (!authError) return;
+    submittingRef.current = false;
+    setLoading(false);
+  }, [authError]);
+
   const handleVerify = async (pinOverride) => {
+    if (submittingRef.current) return;
     const pin = pinOverride ?? digits.join('');
     if (pin.length < PIN_LENGTH) {
       setError('Please enter all 6 digits of your code.');
       return;
     }
+    submittingRef.current = true;
     setError('');
     setLoading(true);
     const { error: verifyError } = await verifyPin(email, pin);
-    setLoading(false);
 
     if (verifyError) {
+      submittingRef.current = false;
+      setLoading(false);
       setError(verifyError);
       // Clear digits so the user can try again cleanly
       setDigits(Array(PIN_LENGTH).fill(''));
       setTimeout(() => inputRefs[0].current?.focus(), 50);
     }
-    // On success: AuthContext onAuthStateChange fires → AppNavigator switches to AppStack
+    // On success stay in "Verifying..." — AuthContext still loads the member
+    // and settings before AppNavigator switches to AppStack, and re-submitting
+    // the now-used code in that gap would show an "invalid code" error
   };
 
   const handleDigitChange = (text, index) => {
