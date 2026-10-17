@@ -4,12 +4,15 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase';
 import type { Family, Member } from '@/lib/types';
+import {
+  FAMILY_PHOTO_BUCKET as BUCKET, PHOTO_CACHE_SECONDS, prepareFamilyPhoto,
+  storagePathFromUrl, thumbPathFor, thumbUrlFor, fallBackToFullPhoto,
+} from '@/lib/familyPhoto';
 
 interface Props {
   family?: Family & { members?: Member[] };
 }
 
-const BUCKET = 'family-photos';
 const MEMBER_ROLES = ['HoH', 'Son', 'Daughter', 'Son-In-Law', 'Daughter-In-Law', 'Grandparent', 'Grandchild', 'Other'];
 
 
@@ -56,58 +59,65 @@ export default function FamilyForm({ family }: Props) {
   };
 
   // ── photo helpers ─────────────────────────────────────────────────────────
-  const extractStoragePath = (url: string) =>
-    url.split(`/storage/v1/object/public/${BUCKET}/`)[1] ?? null;
-
+  // Removes a photo and its thumbnail. Best-effort: a leftover file is harmless.
   const deleteStoragePhoto = async (url: string) => {
-    const path = extractStoragePath(url);
+    const path = storagePathFromUrl(url);
     if (!path) return;
     const supabase = createBrowserSupabase();
-    await supabase.storage.from(BUCKET).remove([path]);
+    await supabase.storage.from(BUCKET).remove([path, thumbPathFor(path)]);
+  };
+
+  // Existing families save the photo change straight away; new ones on Create.
+  const persistPhotoUrl = async (url: string) => {
+    if (isNew || !family?.id) return true;
+    const res = await fetch(`/api/families/${family.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyName, membershipId, address, address2, city, state, zip, photoUrl: url, members }),
+    });
+    return res.ok;
   };
 
   // ── photo upload ──────────────────────────────────────────────────────────
+  // The old photo is only deleted once the new one is uploaded and saved, so a
+  // failure part-way leaves the family with its old photo rather than none.
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     setUploadingPhoto(true);
+    setError('');
     const supabase = createBrowserSupabase();
-
-    // Delete old photo from storage before uploading a new one
-    if (photoUrl) {
-      await deleteStoragePhoto(photoUrl);
-    }
-
     const path = `${family?.id ?? 'new'}/family-${Date.now()}.jpg`;
-    const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true });
-    if (uploadErr) { setError(uploadErr.message); setUploadingPhoto(false); return; }
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    const url = data.publicUrl;
-    setPhotoUrl(url);
-    // Immediately persist the photo URL to the database for existing families
-    if (!isNew && family?.id) {
-      await fetch(`/api/families/${family.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyName, membershipId, address, address2, city, state, zip, photoUrl: url, members }),
-      });
+    const options = { contentType: 'image/jpeg', cacheControl: PHOTO_CACHE_SECONDS };
+
+    try {
+      const { photo, thumb } = await prepareFamilyPhoto(file);
+      const { error: photoErr } = await supabase.storage.from(BUCKET).upload(path, photo, options);
+      if (photoErr) throw new Error(photoErr.message);
+      const { error: thumbErr } = await supabase.storage.from(BUCKET).upload(thumbPathFor(path), thumb, options);
+      const url = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+      if (thumbErr || !(await persistPhotoUrl(url))) {
+        await deleteStoragePhoto(url);
+        throw new Error(thumbErr?.message ?? 'The photo could not be saved. Please try again.');
+      }
+      if (photoUrl) await deleteStoragePhoto(photoUrl);
+      setPhotoUrl(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed. Please try again.');
+    } finally {
+      setUploadingPhoto(false);
     }
-    setUploadingPhoto(false);
   };
 
   const handleRemovePhoto = async () => {
-    // Delete the photo from storage
-    if (photoUrl) {
-      await deleteStoragePhoto(photoUrl);
+    setError('');
+    if (!(await persistPhotoUrl(''))) {
+      setError('The photo could not be removed. Please try again.');
+      return;
     }
+    if (photoUrl) await deleteStoragePhoto(photoUrl);
     setPhotoUrl('');
-    if (!isNew && family?.id) {
-      await fetch(`/api/families/${family.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyName, membershipId, address, address2, city, state, zip, photoUrl: '', members }),
-      });
-    }
   };
 
   // ── member helpers ────────────────────────────────────────────────────────
@@ -157,7 +167,7 @@ export default function FamilyForm({ family }: Props) {
         <div className="flex items-center gap-4">
           {photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={photoUrl} alt="Family" className="w-36 h-36 rounded-xl object-cover" />
+            <img src={thumbUrlFor(photoUrl)} onError={fallBackToFullPhoto(photoUrl)} alt="Family" className="w-36 h-36 rounded-xl object-cover" />
           ) : (
             <div className="w-36 h-36 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 text-2xl">📷</div>
           )}
