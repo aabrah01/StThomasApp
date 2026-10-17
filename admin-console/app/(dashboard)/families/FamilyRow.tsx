@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { thumbUrlFor, fallBackToFullPhoto } from '@/lib/familyPhoto';
 
 interface Props {
   family: { id: string; family_name: string; membership_id: string; photo_url?: string; hoh_names?: string };
@@ -18,7 +19,7 @@ export function FamilyRow({ family: f }: Props) {
         <div className="flex items-center gap-3">
           {f.photo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={f.photo_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+            <img src={thumbUrlFor(f.photo_url)} onError={fallBackToFullPhoto(f.photo_url)} alt="" className="w-8 h-8 rounded-full object-cover" />
           ) : (
             <div className="w-8 h-8 rounded-full bg-[#A83A42]/15 flex items-center justify-center text-xs font-bold text-[#5C1A1F]">
               {f.family_name?.slice(0, 2).toUpperCase()}
