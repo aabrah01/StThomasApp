@@ -1,10 +1,15 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
+import { thumbUrlFor } from '../../services/storageService';
 
 const FamilyCard = React.memo(({ family, cardWidth, onPress }) => {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  // Photos uploaded before thumbnails existed may have none; show the full
+  // photo for those instead of a blank card.
+  const [thumbFailedFor, setThumbFailedFor] = useState(null);
+  const photoUri = thumbFailedFor === family.photoUrl ? family.photoUrl : thumbUrlFor(family.photoUrl);
 
   const initials = family.familyName
     .trim()
@@ -18,7 +23,11 @@ const FamilyCard = React.memo(({ family, cardWidth, onPress }) => {
     <TouchableOpacity style={[styles.card, { width: cardWidth }]} onPress={() => onPress(family.id)} activeOpacity={0.85}>
       <View style={styles.photoContainer}>
         {family.photoUrl ? (
-          <Image source={{ uri: family.photoUrl }} style={styles.photo} />
+          <Image
+            source={{ uri: photoUri }}
+            style={styles.photo}
+            onError={() => setThumbFailedFor(family.photoUrl)}
+          />
         ) : (
           <View style={styles.placeholder}>
             <Text style={styles.initials}>{initials}</Text>
